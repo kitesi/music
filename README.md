@@ -77,7 +77,9 @@ them
 and has either `blue` or `objects` in it
 
 `--dry-run | -d` => dry run, show the results, don't actually open vlc
+
 `--new | -n` => sort by new, play by newest as well
+
 `--limit {num} | -l` => limit the amount of songs played. works in combination of `-n`
 
 ### Installing music
