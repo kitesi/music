@@ -46,6 +46,8 @@ function doesSongPass(terms: string[], songPath: string): boolean {
     let passedOneTerm = false;
 
     for (let term of terms) {
+        term = term.toLowerCase();
+
         const isExclusion = term.startsWith('!');
 
         if (isExclusion) {
@@ -83,7 +85,9 @@ function getSongsByTerms(terms: string[]) {
                 if (
                     doesSongPass(
                         terms,
-                        nextPath.toLowerCase().replace(songsPath, '')
+                        nextPath
+                            .toLowerCase()
+                            .replace(songsPath.toLowerCase(), '')
                     )
                 ) {
                     chosenSongs.push(nextPath.replace(songsPath + '/', ''));
