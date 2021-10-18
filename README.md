@@ -1,20 +1,20 @@
 # Music CLI
 
 <!-- prettier-ignore -->
-- [About](#about)
+- [About](#about) 
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
-- [Folder Structure](#folder-structure)
 - [Usage](#usage)
+  - [Folder Structure](#folder-structure)
   - [Playing Music](#playing-music)
   - [Installing music](#installing-music)
+  - [Auto Completion](#auto-completion)
 - [Plans](#plans)
 
 ## About
 
-Simple music command line tool that works with local files.
-Does not include a tui, or interactive mode.
+Simple music command line tool that works with local files. Does not include a tui, or interactive mode.
 
 ## Features
 
@@ -36,7 +36,9 @@ Does not include a tui, or interactive mode.
 npm install -g @karizma/music
 ```
 
-## Folder Structure
+## Usage
+
+### Folder Structure
 
 Your `~/Music` folder should have folders only, and in those folders you should
 have the music files:
@@ -50,9 +52,7 @@ have the music files:
         z.mp3
 ```
 
-This program does not currently check if it follows it.
-
-## Usage
+This program does not currently check if the path follows the format.
 
 ### Playing Music
 
@@ -87,11 +87,45 @@ and has either `blue` or `objects` in it
 `music install https://www.youtube.com/watch?v=jsdoi309asd mac-miller` =>
 download from youtube
 
+3rd parameter is the youtube link or id, the 4th parameter is the folder name.
+The folder name can be pretty loose in comparasion to the real name. Essentially
+it's case insensitive and it replaces spaces with dashes (-).
+
+### Auto Completion
+
+If you are using bash you can add something similar to this in your `.bashrc`:
+
+```bash
+_music_completions()
+{
+
+    local cur_word="${COMP_WORDS[COMP_CWORD]}"
+    local second_prev_word="${COMP_WORDS[COMP_CWORD - 2]}"
+
+    if [ "$second_prev_word" == "install" ]; then
+        local IFS=$'\n'
+        COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}" -- ${cur_word}) )
+    else
+        local generic_options="install --help --new --dry-run --limit --new -h -n -d -l"
+        COMPREPLY=( $(compgen -W "${generic_options}" -- ${cur_word}) )
+    fi
+
+
+    # if no match was found, fall back to filename completion
+    if [ ${#COMPREPLY[@]} -eq 0 ]; then
+      COMPREPLY=()
+    fi
+
+    return 0
+}
+
+complete -F _music_completions music
+```
+
 ## Plans
 
 <!-- prettier-ignore -->
 - Faster, (currently uses a lot of sync functions)
-- More checking
 - Tests
 - Config
   - Folder path
