@@ -93,12 +93,13 @@ it's case insensitive and it replaces spaces with dashes (-).
 
 ### Auto Completion
 
-If you are using bash you can add something similar to this in your `.bashrc`:
+If you are using bash you can add this in your `.bashrc`:
 
 ```bash
 _music_completions()
 {
 
+    local SONGS_SUB_DIRS=$(basename -a ~/Music/*/ | sed 's/ /-/g' | awk '{print tolower($0)}')
     local cur_word="${COMP_WORDS[COMP_CWORD]}"
     local second_prev_word="${COMP_WORDS[COMP_CWORD - 2]}"
 
