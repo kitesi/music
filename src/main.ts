@@ -3,12 +3,12 @@
 import { statSync, readdirSync } from 'fs';
 import { exec as realExec } from 'child_process';
 import { promisify } from 'util';
+import { config } from './config.js';
 import path from 'path';
 import yargs from 'yargs';
 import chalk from 'chalk';
-import os from 'os';
 
-const songsPath = path.join(os.homedir(), 'Music');
+const songsPath = config.get('path') as string;
 
 function logErrors(reason: any) {
     console.error('Error: ' + (reason?.message || `\n\n${reason}`));
@@ -173,6 +173,13 @@ yargs(process.argv.slice(2))
                 }),
         // @ts-ignore
         handler: defaultCommandHandler,
+    })
+    .command({
+        command: 'get-config-path',
+        describe: 'get the config path',
+        handler: () => {
+            console.log(config.path);
+        },
     })
     .command({
         command: ['install <id> <folder>', 'i', 'download', 'd'],

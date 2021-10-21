@@ -1,3 +1,9 @@
+# 1.1.0 (10/20/21)
+
+<!-- prettier-ignore -->
+- add ability to configure music path
+- add completion script to readme
+
 # 1.0.1 (10/10/21)
 
 <!-- prettier-ignore -->

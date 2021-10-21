@@ -38,9 +38,13 @@ npm install -g @karizma/music
 
 ## Usage
 
+### Configuration
+
+In your config file (differs for OSes; run `music get-config-path`), you can define your music path. This is where all your song files should be at. The default value is `~/Music`.
+
 ### Folder Structure
 
-Your `~/Music` folder should have folders only, and in those folders you should
+Your music folder should have folders only, and in those folders you should
 have the music files:
 
 ```text
@@ -56,10 +60,11 @@ This program does not currently check if the path follows the format.
 
 ### Playing Music
 
-When filtering, the string that's compared is the full path to the file minus
-`~/Music`.
+When filtering, the string that's compared is the full path to the file minus your music path.
 
 For example, `~/Music/Mac Miller/Objects In The Mirror.m4a` would use `Mac Miller/Objects In The Mirror.m4a`.
+
+Filtering is best shown by examples:
 
 `music` => open all songs
 
@@ -70,11 +75,13 @@ For example, `~/Music/Mac Miller/Objects In The Mirror.m4a` would use `Mac Mille
 `music blackbear !bad` => open all songs that have the word `blackbear` in them
 but does not have the word `bad`
 
-`music mac#objects` => open all songs that have the words `mac` and `objects` in
+j`music mac#objects` => open all songs that have the words `mac` and `objects` in
 them
 
 `music mac#blue,objects` => open all songs that have the words `mac` in them,
 and has either `blue` or `objects` in it
+
+Flairs:
 
 `--dry-run | -d` => dry run, show the results, don't actually open vlc
 
@@ -99,6 +106,8 @@ If you are using bash you can add this in your `.bashrc`:
 _music_completions()
 {
 
+    # you can set this variable outside of this function if you want to cache it, but that means the
+    # completions won't be live 24/7.
     local SONGS_SUB_DIRS=$(basename -a ~/Music/*/ | sed 's/ /-/g' | awk '{print tolower($0)}')
     local cur_word="${COMP_WORDS[COMP_CWORD]}"
     local second_prev_word="${COMP_WORDS[COMP_CWORD - 2]}"
@@ -107,7 +116,7 @@ _music_completions()
         local IFS=$'\n'
         COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}" -- ${cur_word}) )
     else
-        local generic_options="install --help --new --dry-run --limit --new -h -n -d -l"
+        local generic_options="install get-config-path --help --new --dry-run --limit --new -h -n -d -l"
         COMPREPLY=( $(compgen -W "${generic_options}" -- ${cur_word}) )
     fi
 
@@ -129,7 +138,6 @@ complete -F _music_completions music
 - Faster, (currently uses a lot of sync functions)
 - Tests
 - Config
-  - Folder path
   - Colors
 - Playlists?
 - Tags?
