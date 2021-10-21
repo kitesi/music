@@ -75,7 +75,7 @@ Filtering is best shown by examples:
 `music blackbear !bad` => open all songs that have the word `blackbear` in them
 but does not have the word `bad`
 
-j`music mac#objects` => open all songs that have the words `mac` and `objects` in
+`music mac#objects` => open all songs that have the words `mac` and `objects` in
 them
 
 `music mac#blue,objects` => open all songs that have the words `mac` in them,
@@ -108,6 +108,8 @@ _music_completions()
 
     # you can set this variable outside of this function if you want to cache it, but that means the
     # completions won't be live 24/7.
+
+    # ~/Music can be replaced with your path to your music folder
     local SONGS_SUB_DIRS=$(basename -a ~/Music/*/ | sed 's/ /-/g' | awk '{print tolower($0)}')
     local cur_word="${COMP_WORDS[COMP_CWORD]}"
     local second_prev_word="${COMP_WORDS[COMP_CWORD - 2]}"
