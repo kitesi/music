@@ -116,6 +116,8 @@ async function defaultCommandHandler(args: {
     limit: number;
     new: boolean;
     'dry-run': boolean;
+    'play-new-first': boolean;
+    'delete-old-first': boolean;
 }) {
     if ((!args.terms || args.terms.length === 0) && !args.limit) {
         console.log('Playing all songs');
@@ -129,7 +131,8 @@ async function defaultCommandHandler(args: {
         return console.error("Didn't match anything");
     }
 
-    if (args.new) {
+    if (args.new || args['delete-old-first']) {
+        console.log(2);
         songs.sort(sortByNew);
     }
 
@@ -137,7 +140,13 @@ async function defaultCommandHandler(args: {
         songs.length = args.limit;
     }
 
+    // !args['dof'] to make sure we don't uselessly sort again
+    if ((args.new || args['play-new-first']) && !args['delete-old-first']) {
+        songs.sort(sortByNew);
+    }
+
     const playingMessage = `Playing: [${songs.length}]`;
+
     console.log(
         `${playingMessage}\n` +
             songs.map((e) => chalk.redBright('- ' + e)).join('\n')
@@ -145,11 +154,17 @@ async function defaultCommandHandler(args: {
 
     exec(
         `vlc ${songs
-            .map((s) => `"${songsPath}/${s}" ${args.new ? '--no-random' : ''}`)
+            .map(
+                (s) =>
+                    `"${songsPath}/${s}" ${
+                        args.new || args['play-new-first'] ? '--no-random' : ''
+                    }`
+            )
             .join(' ')}`
     ).catch(logErrors);
     setTimeout(() => process.exit(0), timeoutTillExit);
 }
+
 yargs(process.argv.slice(2))
     .command({
         command: '$0 [terms..]',
@@ -166,6 +181,14 @@ yargs(process.argv.slice(2))
                 .option('new', {
                     alias: 'n',
                     type: 'boolean',
+                })
+                .option('play-new-first', {
+                    type: 'boolean',
+                    alias: 'pnf',
+                })
+                .option('delete-old-first', {
+                    type: 'boolean',
+                    alias: 'dof',
                 })
                 .positional('terms', {
                     type: 'string',

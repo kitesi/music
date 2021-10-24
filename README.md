@@ -1,7 +1,7 @@
 # Music CLI
 
 <!-- prettier-ignore -->
-- [About](#about) 
+- [About](#about)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -85,14 +85,17 @@ Flairs:
 
 `--dry-run | -d` => dry run, show the results, don't actually open vlc
 
-`--new | -n` => sort by new, play by newest as well
+`--limit {num} | -l` => limit the amount of songs played
 
-`--limit {num} | -l` => limit the amount of songs played. works in combination of `-n`
+`--play-new-first | --pnf` => play by newest
+
+`--delete-old-first | --dof` => when used with `--limit`, removes the older songs first
+
+`--new | -n` => `--delete-old-first` and `--play-new-first`
 
 ### Installing music
 
-`music install https://www.youtube.com/watch?v=jsdoi309asd mac-miller` =>
-download from youtube
+`music install https://www.youtube.com/watch?v=jsdoi309asd mac-miller` => download from youtube
 
 3rd parameter is the youtube link or id, the 4th parameter is the folder name.
 The folder name can be pretty loose in comparasion to the real name. Essentially
