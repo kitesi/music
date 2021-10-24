@@ -106,7 +106,7 @@ function sortByNew(a: string, b: string) {
     const songAStats = statSync(path.join(songsPath, a));
     const songBStats = statSync(path.join(songsPath, b));
 
-    return songBStats.mtimeMs - songAStats.mtimeMs;
+    return songBStats.ctimeMs - songAStats.ctimeMs;
 }
 
 // const line = '─'.repeat(60);
