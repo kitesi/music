@@ -1,4 +1,4 @@
-# Upcoming
+# 1.2.0 (10/24/21)
 
 <!-- prettier-ignore -->
 - add flairs on main command
