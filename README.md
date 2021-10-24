@@ -137,6 +137,8 @@ _music_completions()
 
     return 0
 }
+
+complete -F _music_completions music
 ```
 
 ## Plans
