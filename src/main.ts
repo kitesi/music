@@ -191,7 +191,7 @@ yargs(process.argv.slice(2))
 
             for (const possibleFolder of possibleFolders) {
                 if (
-                    possibleFolder.toLowerCase().replace(/\s+g/, '-') ===
+                    possibleFolder.toLowerCase().replace(/\s+/g, '-') ===
                     adjustedFolder
                 ) {
                     selectedFolder = possibleFolder;
