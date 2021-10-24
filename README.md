@@ -89,7 +89,7 @@ Flairs:
 
 `--play-new-first | --pnf` => play by newest
 
-`--delete-old-first | --dof` => when used with `--limit`, removes the older songs first
+`--delete-old-first | --dof` => when used with `--limit`, removes the oldest songs first from the list
 
 `--new | -n` => `--delete-old-first` and `--play-new-first`
 
@@ -101,18 +101,22 @@ Flairs:
 The folder name can be pretty loose in comparasion to the real name. Essentially
 it's case insensitive and it replaces spaces with dashes (-).
 
+Flairs:
+
+`--format | -f` => specify what format to download with, default is m4a
+`--ytdl-args | -y` => specify any ytdl args to add to the command, example `--ytdl-args "-4"`
+
 ### Auto Completion
 
-If you are using bash you can add this in your `.bashrc`:
+If you are using bash you can add the following in your `.bashrc`. Not a 100% accurate solution,
+but I think this is fine. Plus making it parse things to be more specific would just make it slower.
+
+When using `music install`, list all your flairs at the end so you get proper artist/folder completion.
 
 ```bash
 _music_completions()
 {
 
-    # you can set this variable outside of this function if you want to cache it, but that means the
-    # completions won't be live 24/7.
-
-    # ~/Music can be replaced with your path to your music folder
     local SONGS_SUB_DIRS=$(basename -a ~/Music/*/ | sed 's/ /-/g' | awk '{print tolower($0)}')
     local cur_word="${COMP_WORDS[COMP_CWORD]}"
     local second_prev_word="${COMP_WORDS[COMP_CWORD - 2]}"
@@ -121,7 +125,7 @@ _music_completions()
         local IFS=$'\n'
         COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}" -- ${cur_word}) )
     else
-        local generic_options="install get-config-path --help --new --dry-run --limit --new -h -n -d -l"
+        local generic_options="install get-config-path --help --version --play-new-first --delete-old-first --format --ytdl-args --new --dry-run --limit --new --pnf --dof -h -n -d -l -v -f -y"
         COMPREPLY=( $(compgen -W "${generic_options}" -- ${cur_word}) )
     fi
 
@@ -133,8 +137,6 @@ _music_completions()
 
     return 0
 }
-
-complete -F _music_completions music
 ```
 
 ## Plans
@@ -147,3 +149,4 @@ complete -F _music_completions music
 - Playlists?
 - Tags?
   - Maybe using file metadata, having to add it manually would be a pain
+- Command: `music ls`

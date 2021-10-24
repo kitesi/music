@@ -207,7 +207,31 @@ yargs(process.argv.slice(2))
     .command({
         command: ['install <id> <folder>', 'i', 'download', 'd'],
         describe: 'install music from youtube id or url',
-        handler: ({ folder, id }: { folder: string; id: string }) => {
+        builder: (y) => {
+            return y
+                .option('format', {
+                    type: 'string',
+                    default: 'm4a',
+                    alias: 'f',
+                })
+                .option('ytdl-args', {
+                    type: 'string',
+                    default: '',
+                    alias: 'y',
+                });
+        },
+        // @ts-expect-error
+        handler: ({
+            folder,
+            id,
+            format,
+            'ytdl-args': ytdlArgs,
+        }: {
+            folder: string;
+            id: string;
+            format: string;
+            'ytdl-args': string;
+        }) => {
             const possibleFolders = readdirSync(songsPath);
             const adjustedFolder = folder.toLowerCase().replace(/\s+/g, '-');
             let selectedFolder = '';
@@ -231,11 +255,11 @@ yargs(process.argv.slice(2))
                 : `https://www.youtube.com/watch?v=${id}`;
 
             const child = exec(
-                `youtube-dl -f m4a -o "${path.join(
+                `youtube-dl -f ${format} -o "${path.join(
                     songsPath,
                     selectedFolder,
                     '%(title)s.%(ext)s'
-                )}" -- "${youtubeURL}"`
+                )}" ${ytdlArgs} -- "${youtubeURL}"`
             ).child;
 
             if (child.stdout) {
