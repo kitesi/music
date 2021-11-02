@@ -2,7 +2,7 @@
 
 TEMP_SONGS_DIR="/storage/emulated/0/Temp-Music/"
 
-[ -d "$TEMP_SONGS_DIR"] && rm -rf $TEMP_SONGS_DIR
+[ -d "$TEMP_SONGS_DIR" ] && rm -rf $TEMP_SONGS_DIR
 
 mkdir "$TEMP_SONGS_DIR"
 
