@@ -163,6 +163,7 @@ If you want paste friendly commands, you can clone this repo and use `android-te
 
 ```bash
 git clone https://github.com/karizma/music-cli
+chmod +x ./music-cli/android-termux/setup
 ./music-cli/android-termux/setup
 ```
 

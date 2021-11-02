@@ -3,10 +3,8 @@
 # install nodejs
 pkg install nodejs
 
-SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-
 # make mx executable
-chmod +x "$SCRIPT_DIR/mx"
+chmod +x "./music-cli/android-termux/mx"
 
 # cp mx to $PATH so we can call it wherever
-cp ./mx /data/data/com.termux/files/usr/bin/mx
+cp "./music-cli/android-termux/mx" /data/data/com.termux/files/usr/bin/mx
