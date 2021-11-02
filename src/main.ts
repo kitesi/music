@@ -116,12 +116,18 @@ async function defaultCommandHandler(args: {
     limit: number;
     new: boolean;
     'dry-run': boolean;
+    'dry-paths': boolean;
     'play-new-first': boolean;
     'delete-old-first': boolean;
 }) {
-    if ((!args.terms || args.terms.length === 0) && !args.limit) {
+    if (
+        (!args.terms || args.terms.length === 0) &&
+        !args.limit &&
+        !args['dry-paths']
+    ) {
         console.log('Playing all songs');
         exec(`vlc --recursive=expand "${songsPath}"`);
+
         return setTimeout(() => process.exit(0), timeoutTillExit);
     }
 
@@ -132,7 +138,6 @@ async function defaultCommandHandler(args: {
     }
 
     if (args.new || args['delete-old-first']) {
-        console.log(2);
         songs.sort(sortByNew);
     }
 
@@ -143,6 +148,12 @@ async function defaultCommandHandler(args: {
     // !args['dof'] to make sure we don't uselessly sort again
     if ((args.new || args['play-new-first']) && !args['delete-old-first']) {
         songs.sort(sortByNew);
+    }
+
+    if (args['dry-paths']) {
+        return console.log(
+            songs.map((s) => path.join(songsPath, s)).join('\n')
+        );
     }
 
     const playingMessage = `Playing: [${songs.length}]`;
@@ -189,6 +200,10 @@ yargs(process.argv.slice(2))
                 .option('delete-old-first', {
                     type: 'boolean',
                     alias: 'dof',
+                })
+                .option('dry-paths', {
+                    type: 'boolean',
+                    alias: 'p',
                 })
                 .positional('terms', {
                     type: 'string',

@@ -85,6 +85,8 @@ Flairs:
 
 `--dry-run | -d` => dry run, show the results, don't actually open vlc
 
+`--dry-paths | -p` => only output all the matching songs, absolute path. This might help with some scripts.
+
 `--limit {num} | -l` => limit the amount of songs played
 
 `--play-new-first | --pnf` => play by newest

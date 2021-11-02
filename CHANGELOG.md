@@ -1,3 +1,9 @@
+# 1.3.0 (11/2/21)
+
+<!-- prettier-ignore -->
+- fix issue where `config.js` was not being installed for some reason, so the program didn't work at all
+- add `--dry-paths | -p` on main command so you can get a list of all the songs that match
+
 # 1.2.0 (10/24/21)
 
 <!-- prettier-ignore -->
