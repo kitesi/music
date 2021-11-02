@@ -10,6 +10,7 @@
   - [Playing Music](#playing-music)
   - [Installing music](#installing-music)
   - [Auto Completion](#auto-completion)
+  - [Android](#android)
 - [Plans](#plans)
 
 ## About
@@ -141,6 +142,28 @@ _music_completions()
 }
 
 complete -F _music_completions music
+```
+
+### Android
+
+If you want to use this on android, you can, but it's not as great.
+Basically you can use the filtering aspect of this program, copy all the
+files to a directory, and then play that directory on vlc.
+
+You might also be able to use the install command.
+
+You will need termux and the vlc app downloaded.
+
+1. Install nodejs `pkg install nodejs`
+2. Copy `android-termux/mx` to your `$PATH`, the path variable
+   on termux should be `/data/data/com.termux/files/usr/bin`
+3. Make mx executable with `chmod +x /data/data/com.termux/files/usr/bin/mx`
+
+If you want paste friendly commands, you can clone this repo and use `android-termux/setup`:
+
+```bash
+git clone https://github.com/karizma/music-cli
+./music-cli/android-termux/setup
 ```
 
 ## Plans
