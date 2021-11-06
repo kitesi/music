@@ -1,5 +1,7 @@
 # Music CLI
 
+[![NPM version](https://img.shields.io/npm/v/@karizma/music?style=flat-square)](https://www.npmjs.com/package/@karizma/music) [![NPM downloads per week](https://img.shields.io/npm/dw/@karizma/music?color=blue&style=flat-square)](https://www.npmjs.com/package/@karizma/music)
+
 <!-- prettier-ignore -->
 - [About](#about)
 - [Features](#features)
