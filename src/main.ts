@@ -18,23 +18,6 @@ const promiseBasedExec = promisify(realExec);
 let isDryRun = false;
 let exec = promiseBasedExec;
 
-// const exec = isDryRun
-//     ? () => {
-//           // @ts-expect-error
-//           const promise: ReturnType<typeof promiseBasedExec> = Object.assign(
-//               new Promise((res) => res),
-//               {
-//                   child: {
-//                       stdout: () => {},
-//                       stderr: () => {},
-//                   },
-//               }
-//           );
-
-//           return promise;
-//       }
-//     : promiseBasedExec;
-
 const timeoutTillExit = isDryRun ? 0 : 1200;
 
 function doesSongPass(terms: string[], songPath: string): boolean {
@@ -126,7 +109,9 @@ async function defaultCommandHandler(args: {
     if (
         (!args.terms || args.terms.length === 0) &&
         !args.limit &&
-        !args['dry-paths']
+        !args['dry-paths'] &&
+        !args['play-new-first'] &&
+        !args.new
     ) {
         console.log('Playing all songs');
         exec(`vlc --recursive=expand "${songsPath}"`);
@@ -159,12 +144,16 @@ async function defaultCommandHandler(args: {
         );
     }
 
-    const playingMessage = `Playing: [${songs.length}]`;
+    if (!args.terms || args.terms.length === 0) {
+        console.log('Playing all songs');
+    } else {
+        const playingMessage = `Playing: [${songs.length}]`;
 
-    console.log(
-        `${playingMessage}\n` +
-            songs.map((e) => chalk.redBright('- ' + e)).join('\n')
-    );
+        console.log(
+            `${playingMessage}\n` +
+                songs.map((e) => chalk.redBright('- ' + e)).join('\n')
+        );
+    }
 
     exec(
         `vlc ${songs
