@@ -68,6 +68,10 @@ function doesSongPass(terms: string[], songPath: string): boolean {
         }
     }
 
+    if (terms.every((t) => t.startsWith('!'))) {
+        return true;
+    }
+
     return passedOneTerm;
 }
 
