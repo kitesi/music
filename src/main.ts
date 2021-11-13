@@ -14,27 +14,26 @@ function logErrors(reason: any) {
     console.error('Error: ' + (reason?.message || `\n\n${reason}`));
 }
 
-const isDryRun =
-    process.argv.includes('--dry-run') || process.argv.includes('-d');
-
 const promiseBasedExec = promisify(realExec);
+let isDryRun = false;
+let exec = promiseBasedExec;
 
-const exec = isDryRun
-    ? () => {
-          // @ts-expect-error
-          const promise: ReturnType<typeof promiseBasedExec> = Object.assign(
-              new Promise((res) => res),
-              {
-                  child: {
-                      stdout: () => {},
-                      stderr: () => {},
-                  },
-              }
-          );
+// const exec = isDryRun
+//     ? () => {
+//           // @ts-expect-error
+//           const promise: ReturnType<typeof promiseBasedExec> = Object.assign(
+//               new Promise((res) => res),
+//               {
+//                   child: {
+//                       stdout: () => {},
+//                       stderr: () => {},
+//                   },
+//               }
+//           );
 
-          return promise;
-      }
-    : promiseBasedExec;
+//           return promise;
+//       }
+//     : promiseBasedExec;
 
 const timeoutTillExit = isDryRun ? 0 : 1200;
 
@@ -287,4 +286,22 @@ yargs(process.argv.slice(2))
         },
     })
     .alias('h', 'help')
+    .middleware((args) => {
+        // @ts-expect-error
+        isDryRun = args['dry-run'];
+
+        if (isDryRun) {
+            // @ts-expect-error
+            exec = () => {
+                const promise = Object.assign(new Promise((res) => res), {
+                    child: {
+                        stdout: () => {},
+                        stderr: () => {},
+                    },
+                });
+
+                return promise;
+            };
+        }
+    })
     .strict().argv;
