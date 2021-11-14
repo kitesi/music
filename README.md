@@ -76,7 +76,8 @@ Filtering is best shown by examples:
 `music sad,bad` => open all songs that have the word `sad` or `bad` in the title
 
 `music blackbear !bad` => open all songs that have the word `blackbear` in them
-but does not have the word `bad`
+but does not have the word `bad`. Note on bash and other shells you might have to escape `!`.
+When I made this I originally had windows and used cmd, so yea
 
 `music mac#objects` => open all songs that have the words `mac` and `objects` in
 them
@@ -94,7 +95,7 @@ Flairs:
 
 `--play-new-first | --pnf` => play by newest
 
-`--delete-old-first | --dof` => when used with `--limit`, removes the oldest songs first from the list
+`--delete-old-first | --dof` => when used with `--limit`, prioritizes the newest songs from the list
 
 `--new | -n` => `--delete-old-first` and `--play-new-first`
 
@@ -176,6 +177,11 @@ chmod +x ./music-cli/android-termux/setup
 - Tests
 - Config
   - Colors
+  - Symbols (`!`, `#`, `,`)
+- Better documentation
+- Flairs
+  - `--old | -o` sort by old
+  - `--delete-new-first | --dnf` prioritize old songs
 - Playlists?
 - Tags?
   - Maybe using file metadata, having to add it manually would be a pain

@@ -1,3 +1,10 @@
+# 1.4.0 (11/14/21)
+
+<!-- prettier-ignore -->
+- fix `-d` not working when used in the same flair as other shorthand alises. Example: `-dn` would not work. This is because the code simply checked if `-d` or `--dry-run` was in the command line arguments. Now it checks what yargs resolves the value to.
+- allow `-n` with all songs / no terms
+- make it so no positive search terms with negative search terms defaults to match. For example `music !the` before would match nothing, now it matches every song that doesn't have the word 'the'.
+
 # 1.3.0 (11/2/21)
 
 <!-- prettier-ignore -->
@@ -9,7 +16,7 @@
 <!-- prettier-ignore -->
 - add flairs on main command
   - `--play-new-first | --pnf`, play newest songs first
-  - `--delete-old-first | --dof`, when filtering, remove the oldest songs first
+  - `--delete-old-first | --dof`, when filtering, prioritize the newest songs first
 - add flairs on install command
   - `--format | -f`, specify what format to download with, default is m4a like before
   - `--ytdl-args | -y`, specify any ytdl args to add to the command, example `--ytdl-args "-4"`
