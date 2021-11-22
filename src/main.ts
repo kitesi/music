@@ -144,7 +144,7 @@ async function defaultCommandHandler(args: {
         );
     }
 
-    if (!args.terms || args.terms.length === 0) {
+    if (!args.limit && (!args.terms || args.terms.length === 0)) {
         console.log('Playing all songs');
     } else {
         const playingMessage = `Playing: [${songs.length}]`;
