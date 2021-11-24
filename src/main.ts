@@ -8,10 +8,10 @@ import path from 'path';
 import yargs from 'yargs';
 import chalk from 'chalk';
 
-const songsPath = config.get('path') as string;
-const vlcPath = config.get('pathToVLC') as string;
-const persist = config.get('persist') as boolean;
-const sortType = config.get('sortType') as 'atimeMs' | 'ctimeMs' | 'mtimeMs';
+let songsPath = config.get('path') as string;
+let vlcPath = config.get('pathToVLC') as string;
+let persist = config.get('persist') as boolean;
+let sortType = config.get('sortType') as 'atimeMs' | 'ctimeMs' | 'mtimeMs';
 
 function logErrors(reason: any) {
     console.error('Error: ' + (reason?.message || `\n\n${reason}`));
@@ -100,15 +100,21 @@ function sortByNew(a: string, b: string) {
 
 // const line = '─'.repeat(60);
 
-async function defaultCommandHandler(args: {
+interface DefaultCommandArgs {
     terms?: string[];
     limit: number;
     new: boolean;
+    persist?: boolean;
     'dry-run': boolean;
     'dry-paths': boolean;
     'play-new-first': boolean;
     'delete-old-first': boolean;
-}) {
+    'vlc-path': string;
+    'songs-path': string;
+    'sort-type': 'a' | 'c' | 'm';
+}
+
+async function defaultCommandHandler(args: DefaultCommandArgs) {
     if (
         (!args.terms || args.terms.length === 0) &&
         !args.limit &&
@@ -207,6 +213,19 @@ yargs(process.argv.slice(2))
                     type: 'boolean',
                     alias: 'p',
                 })
+                .option('persist', {
+                    type: 'boolean',
+                })
+                .option('vlc-path', {
+                    type: 'string',
+                })
+                .option('sort-type', {
+                    type: 'string',
+                    choices: ['a', 'm', 'c'],
+                })
+                .option('songs-path', {
+                    type: 'string',
+                })
                 .positional('terms', {
                     type: 'string',
                     array: true,
@@ -289,8 +308,8 @@ yargs(process.argv.slice(2))
         },
     })
     .alias('h', 'help')
-    .middleware((args) => {
-        // @ts-expect-error
+    // @ts-expect-error
+    .middleware((args: DefaultCommandArgs) => {
         isDryRun = args['dry-run'];
 
         if (isDryRun) {
@@ -305,6 +324,23 @@ yargs(process.argv.slice(2))
 
                 return promise;
             };
+        }
+
+        if (typeof args.persist !== 'undefined') {
+            persist = args.persist;
+        }
+
+        if (args['vlc-path']) {
+            vlcPath = args['vlc-path'];
+        }
+
+        if (args['songs-path']) {
+            songsPath = path.join(args['songs-path']);
+        }
+
+        if (args['sort-type']) {
+            // @ts-expect-error
+            sortType = args['sort-type'] + 'timeMs';
         }
     })
     .strict().argv;
