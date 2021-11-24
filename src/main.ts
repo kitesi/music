@@ -159,8 +159,8 @@ async function defaultCommandHandler(args: DefaultCommandArgs) {
         songs.length = args.limit;
     }
 
-    // !args['dof'] to make sure we don't uselessly sort again
-    if ((args.new || args['play-new-first']) && !args['delete-old-first']) {
+    // !args.new && !args['delete-old-first'] to make sure we don't uselessly sort again
+    if (args['play-new-first'] && !args.new && !args['delete-old-first']) {
         songs.sort(sortByNew);
     }
 
