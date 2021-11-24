@@ -61,7 +61,7 @@ function doesSongPass(terms: string[], songPath: string): boolean {
     return passedOneTerm;
 }
 
-function getSongsByTerms(terms: string[]) {
+function getSongsByTerms(terms: string[], limit?: number) {
     const chosenSongs: string[] = [];
 
     function walk(dir: string) {
@@ -69,8 +69,9 @@ function getSongsByTerms(terms: string[]) {
 
         for (const file of files) {
             const nextPath = path.join(dir, file);
+            const stats = statSync(nextPath);
 
-            if (file.includes('.')) {
+            if (!stats.isDirectory()) {
                 if (
                     doesSongPass(
                         terms,
@@ -79,7 +80,13 @@ function getSongsByTerms(terms: string[]) {
                             .replace(songsPath.toLowerCase(), '')
                     )
                 ) {
-                    chosenSongs.push(nextPath.replace(songsPath + '/', ''));
+                    // all the walk process-es that started will still run, idk
+                    // how to early exit out of function from inner function
+                    if (limit && chosenSongs.length === limit) {
+                        return;
+                    } else {
+                        chosenSongs.push(nextPath.replace(songsPath + '/', ''));
+                    }
                 }
             } else {
                 walk(nextPath);
@@ -132,7 +139,13 @@ async function defaultCommandHandler(args: DefaultCommandArgs) {
         return setTimeout(() => process.exit(0), timeoutTillExit);
     }
 
-    let songs = getSongsByTerms(args.terms || []);
+    let songs = getSongsByTerms(
+        args.terms || [],
+        // only give a limit if there is no need for sorting
+        !args.new && !args['delete-old-first'] && !args['play-new-first']
+            ? args.limit
+            : undefined
+    );
 
     if (songs.length === 0) {
         return console.error("Didn't match anything");
@@ -335,7 +348,7 @@ yargs(process.argv.slice(2))
         }
 
         if (args['songs-path']) {
-            songsPath = path.join(args['songs-path']);
+            songsPath = path.join(process.cwd(), args['songs-path']);
         }
 
         if (args['sort-type']) {
