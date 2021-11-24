@@ -10,6 +10,7 @@ import chalk from 'chalk';
 
 const songsPath = config.get('path') as string;
 const vlcPath = config.get('pathToVLC') as string;
+const persist = config.get('persist') as boolean;
 const sortType = config.get('sortType') as 'atimeMs' | 'ctimeMs' | 'mtimeMs';
 
 function logErrors(reason: any) {
@@ -118,6 +119,10 @@ async function defaultCommandHandler(args: {
         console.log('Playing all songs');
         exec(`${vlcPath} --recursive=expand "${songsPath}"`);
 
+        if (persist) {
+            return;
+        }
+
         return setTimeout(() => process.exit(0), timeoutTillExit);
     }
 
@@ -167,7 +172,10 @@ async function defaultCommandHandler(args: {
             )
             .join(' ')}`
     ).catch(logErrors);
-    setTimeout(() => process.exit(0), timeoutTillExit);
+
+    if (!persist) {
+        setTimeout(() => process.exit(0), timeoutTillExit);
+    }
 }
 
 yargs(process.argv.slice(2))

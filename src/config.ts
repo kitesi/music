@@ -5,7 +5,12 @@ import envPaths from 'env-paths';
 
 import type ConfType from 'conf';
 
-let config: ConfType<{ path: unknown; sortType: unknown; pathToVLC: unknown }>;
+let config: ConfType<{
+    path: unknown;
+    sortType: unknown;
+    pathToVLC: unknown;
+    persist: unknown;
+}>;
 
 try {
     config = new Conf({
@@ -25,6 +30,10 @@ try {
                 // pattern: '(a|c|m)timeMs',
                 enum: ['atimeMs', 'ctimeMs', 'mtimeMs'],
                 default: 'mtimeMs',
+            },
+            persist: {
+                type: 'boolean',
+                default: false,
             },
         },
     });
