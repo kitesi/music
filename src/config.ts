@@ -5,7 +5,7 @@ import envPaths from 'env-paths';
 
 import type ConfType from 'conf';
 
-let config: ConfType<{ path: unknown; sortType: unknown }>;
+let config: ConfType<{ path: unknown; sortType: unknown; pathToVLC: unknown }>;
 
 try {
     config = new Conf({
@@ -14,6 +14,11 @@ try {
             path: {
                 type: 'string',
                 default: path.join(os.homedir(), 'Music'),
+            },
+            pathToVLC: {
+                type: 'string',
+                // assume it's in global path
+                default: 'vlc',
             },
             sortType: {
                 type: 'string',

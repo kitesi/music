@@ -9,6 +9,7 @@ import yargs from 'yargs';
 import chalk from 'chalk';
 
 const songsPath = config.get('path') as string;
+const vlcPath = config.get('pathToVLC') as string;
 const sortType = config.get('sortType') as 'atimeMs' | 'ctimeMs' | 'mtimeMs';
 
 function logErrors(reason: any) {
@@ -115,7 +116,7 @@ async function defaultCommandHandler(args: {
         !args.new
     ) {
         console.log('Playing all songs');
-        exec(`vlc --recursive=expand "${songsPath}"`);
+        exec(`${vlcPath} --recursive=expand "${songsPath}"`);
 
         return setTimeout(() => process.exit(0), timeoutTillExit);
     }
@@ -157,7 +158,7 @@ async function defaultCommandHandler(args: {
     }
 
     exec(
-        `vlc ${songs
+        `${vlcPath} ${songs
             .map(
                 (s) =>
                     `"${songsPath}/${s}" ${
