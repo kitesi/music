@@ -20,12 +20,14 @@
     ],
     "author": "karizma",
     "license": "MIT",
+    "type": "module",
     "devDependencies": {},
     "dependencies": {
         "@types/node": "^16.10.2",
         "@types/yargs": "^17.0.0",
         "chalk": "^4.1.1",
         "conf": "^10.0.3",
+        "env-paths": "^3.0.0",
         "yargs": "^17.0.1"
     },
     "repository": {

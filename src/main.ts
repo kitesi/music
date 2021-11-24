@@ -9,6 +9,7 @@ import yargs from 'yargs';
 import chalk from 'chalk';
 
 const songsPath = config.get('path') as string;
+const sortType = config.get('sortType') as 'atimeMs' | 'ctimeMs' | 'mtimeMs';
 
 function logErrors(reason: any) {
     console.error('Error: ' + (reason?.message || `\n\n${reason}`));
@@ -92,7 +93,7 @@ function sortByNew(a: string, b: string) {
     const songAStats = statSync(path.join(songsPath, a));
     const songBStats = statSync(path.join(songsPath, b));
 
-    return songBStats.ctimeMs - songAStats.ctimeMs;
+    return songBStats[sortType] - songAStats[sortType];
 }
 
 // const line = '─'.repeat(60);
