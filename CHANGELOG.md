@@ -1,3 +1,14 @@
+# 1.5.0 (11/28/21)
+
+<!-- prettier-ignore -->
+- fix 'playing all' showing when `-l` was specified but no terms were specified
+- add config options on command line and global config file
+  - `--sort-type` `.sortType`, options on command line are `a`, `c`, `m`. Options on config file are `atimeMs`, `ctimeMs`. and `mtimeMs`
+  - `--persist` `.persist` decides if the program should still run. If this option is selected, once the program terminates, so does vlc.
+  - `--vlc-path` `.pathToVLC` allows you to set the path to the executable. Default is assuming it's in the global path
+- add option `--songs-path`, which allows you to specify which folder to go off of
+- better walk function (checks if an item is a file or folder)
+
 # 1.4.0 (11/14/21)
 
 <!-- prettier-ignore -->
