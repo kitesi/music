@@ -17,7 +17,7 @@
 
 ## About
 
-Simple music command line tool that works with local files. Does not include a tui, or interactive mode.
+Simple music command line tool mainly for quick and robust querying. Works with local audio files. Does not include a tui, or interactive mode. Uses vlc internally.
 
 ## Features
 
@@ -43,12 +43,20 @@ npm install -g @karizma/music
 
 ### Configuration
 
-In your config file (differs for OSes; run `music get-config-path`), you can define your music path. This is where all your song files should be at. The default value is `~/Music`.
+In your config file (differs for OSes; run `music get-config-path`)
+
+The directory:
+
+<!-- prettier-ignore -->
+- MacOS: `~/Library/Preferences/music-cli-nodejs`
+- Windows: `%APPDATA%\music-cli-nodejs\Config` (example: `C:\Users\USERNAME\AppData\Roaming\music-cli-nodejs\Config`)
+- Linux: `~/.config/music-cli-nodejs` (or `$XDG_CONFIG_HOME/music-cli-nodejs`)
+
+And then in that directory, you need to make a config.json
 
 ### Folder Structure
 
-Your music folder should have folders only, and in those folders you should
-have the music files:
+Any file in your music folder will be considered when querying.
 
 ```text
 ~/Music/
@@ -58,8 +66,6 @@ have the music files:
     Category/
         z.mp3
 ```
-
-This program does not currently check if the path follows the format.
 
 ### Playing Music
 
@@ -115,11 +121,13 @@ Flairs:
 
 ### Installing music
 
-`music install https://www.youtube.com/watch?v=jsdoi309asd mac-miller` => download from youtube
+`music install "https://www.youtube.com/watch?v=K4DyBUG242c" ncs` => download from youtube
 
 1st positional argument is the youtube link or id, the second is the folder name.
 The folder name can be pretty loose in comparasion to the real name. Essentially
 it's case insensitive and it replaces spaces with dashes (-).
+
+Note: this program does not support piracy.
 
 Flairs:
 
@@ -186,8 +194,6 @@ You will need termux and the vlc app downloaded.
 1. Install nodejs `pkg install nodejs`
 2. Copy `android-termux-mx` to `/data/data/com.termux/files/usr/bin`
 3. Make mx executable with `chmod +x /data/data/com.termux/files/usr/bin/mx`
-
-If you want paste friendly commands, you can clone this repo and use `android-termux/setup`:
 
 ```bash
 pkg install nodejs
