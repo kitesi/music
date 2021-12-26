@@ -85,7 +85,7 @@ function getSongsByTerms(terms: string[], limit?: number) {
                     if (limit && chosenSongs.length === limit) {
                         return;
                     } else {
-                        chosenSongs.push(nextPath.replace(songsPath + '/', ''));
+                        chosenSongs.push(nextPath.replace(songsPath + path.sep, ''));
                     }
                 }
             } else {
