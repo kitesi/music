@@ -199,7 +199,8 @@ async function defaultCommandHandler(args: DefaultCommandArgs) {
 
 yargs(process.argv.slice(2))
     .command({
-        command: '$0 [terms..]',
+        command: ['play [terms..]', 'p'],
+        describe: 'play music',
         builder: (y) =>
             y
                 .option('dry-run', {
@@ -254,7 +255,7 @@ yargs(process.argv.slice(2))
         },
     })
     .command({
-        command: ['install <id> <folder>', 'i', 'download', 'd'],
+        command: ['install <id> <folder>', 'i'],
         describe: 'install music from youtube id or url',
         builder: (y) => {
             return y

@@ -1,3 +1,9 @@
+# 1.6.0 (1/11/22)
+
+<!-- prettier-ignore -->
+- change default command to `play` and `p`
+- better bash completion
+
 # 1.5.0 (11/28/21)
 
 <!-- prettier-ignore -->
