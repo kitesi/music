@@ -145,21 +145,21 @@ _music_completions()
     local cur_word="${COMP_WORDS[COMP_CWORD]}"
     local prev_word="${COMP_WORDS[COMP_CWORD - 1]}"
 
-    local installCommand=false
+    local install_command=false
 
     for i in "${COMP_WORDS[@]}"
     do
-        if [ "$i" = "install" ]; then
-            installCommand=true
+        if [ "$i" = "install" ] || [ "$i" = "i" ] && [ "${COMP_WORDS[COMP_CWORD]}" != "i" ]; then
+            install_command=true
             break
         fi
     done
 
-    if [ "$prev_word" = "install" ]; then
+    if [ "$prev_word" = "install" ] || [ "$prev_word" = "i" ]; then
         COMPREPLY=( $(compgen -W "https://www.youtube.com/watch?v=" -- ${cur_word}) )
     elif [ "$prev_word" = "--format" ] || [ "$prev_word" = "-f" ]; then
         COMPREPLY=( $(compgen -W "3gp aac flv m4a mp3 mp4 ogg wav webm" -- ${cur_word}) )
-    elif [ "$installCommand" = true ]; then
+    elif [ "$install_command" = true ]; then
         # depending how up to date you want this to be, you can set this variable outside of
         # this function (global scope). It's still pretty fast for me so I personally won't
         local SONGS_SUB_DIRS=$(basename -a ~/Music/*/ | sed 's/ /-/g' | awk '{print tolower($0)}' | tr '\n' ' ')
@@ -169,14 +169,12 @@ _music_completions()
     elif [ "$prev_word" = "--songs-path" ] || [ "$prev_word" = "--vlc-path" ]; then
         COMPREPLY=()
     else
-        local generic_options="install get-config-path --help --version --dry-paths --play-new-first --delete-old-first --persist --vlc-path --sort-type --songs-path--new --dry-run --limit --new --pnf --dof --no-persist -h -n -d -l -p"
+        local generic_options="install play get-config-path --help --version --dry-paths --play-new-first --delete-old-first --persist --vlc-path --sort-type --songs-path --dry-run --limit --new --pnf --dof --no-persist -h -n -d -l -p"
         COMPREPLY=( $(compgen -W "${generic_options}" -- ${cur_word}) )
     fi
 
     return 0
 }
-
-complete -F _music_completions -o default music
 ```
 
 ### Android
