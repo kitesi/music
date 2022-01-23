@@ -85,7 +85,9 @@ function getSongsByTerms(terms: string[], limit?: number) {
                     if (limit && chosenSongs.length === limit) {
                         return;
                     } else {
-                        chosenSongs.push(nextPath.replace(songsPath + path.sep, ''));
+                        chosenSongs.push(
+                            nextPath.replace(songsPath + path.sep, '')
+                        );
                     }
                 }
             } else {
@@ -268,6 +270,10 @@ yargs(process.argv.slice(2))
                     type: 'string',
                     default: '',
                     alias: 'y',
+                })
+                .option('name', {
+                    type: 'string',
+                    alias: 'n',
                 });
         },
         // @ts-expect-error
@@ -276,11 +282,13 @@ yargs(process.argv.slice(2))
             id,
             format,
             'ytdl-args': ytdlArgs,
+            name: fileName,
         }: {
             folder: string;
             id: string;
-            format: string;
-            'ytdl-args': string;
+            format?: string;
+            'ytdl-args'?: string;
+            name?: string;
         }) => {
             const possibleFolders = readdirSync(songsPath);
             const adjustedFolder = folder.toLowerCase().replace(/\s+/g, '-');
@@ -308,7 +316,7 @@ yargs(process.argv.slice(2))
                 `youtube-dl -f ${format} -o "${path.join(
                     songsPath,
                     selectedFolder,
-                    '%(title)s.%(ext)s'
+                    (fileName && fileName + '.%(ext)s') || '%(title)s.%(ext)s'
                 )}" ${ytdlArgs} -- "${youtubeURL}"`
             ).child;
 
