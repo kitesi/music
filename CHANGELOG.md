@@ -1,3 +1,8 @@
+# 1.7.0 (1/23/22)
+
+<!-- prettier-ignore -->
+- add `-n | --name` to install command, so you can specify the file name
+
 # 1.6.1 (1/11/22)
 
 <!-- prettier-ignore -->

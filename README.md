@@ -133,6 +133,7 @@ Flairs:
 
 `--format | -f` => specify what format to download with, default is m4a. All the allowed formats are just what ytdl allows. Currently it is `3gp`, `aac`, `flv`, `m4a`, `mp3`, `mp4`, `ogg`, `wav`, `webm`
 `--ytdl-args | -y` => specify any ytdl args to add to the command, example: `--ytdl-args "-4"`
+`--name | -n` => specify the file name
 
 ### Auto Completion
 
@@ -163,7 +164,7 @@ _music_completions()
         # depending how up to date you want this to be, you can set this variable outside of
         # this function (global scope). It's still pretty fast for me so I personally won't
         local SONGS_SUB_DIRS=$(basename -a ~/Music/*/ | sed 's/ /-/g' | awk '{print tolower($0)}' | tr '\n' ' ')
-        COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}--format --ytdl-args -f -y" -- ${cur_word}) )
+        COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}--format --ytdl-args --name -f -y -n" -- ${cur_word}) )
     elif [ "$prev_word" = "--sort-type" ]; then
         COMPREPLY=( $(compgen -W "a c m" -- ${cur_word}) )
     elif [ "$prev_word" = "--songs-path" ] || [ "$prev_word" = "--vlc-path" ]; then
@@ -198,6 +199,8 @@ pkg install nodejs
 curl https://raw.githubusercontent.com/karizma/music-cli/main/android-termux-mx > /data/data/com.termux/files/usr/bin/mx
 chmod +x /data/data/com.termux/files/usr/bin/mx
 ```
+
+Now you can run mx like so: `mx jacob`
 
 ## Plans
 
