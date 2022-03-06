@@ -4,11 +4,7 @@ use home;
 use regex::Regex;
 use walkdir::WalkDir;
 
-use std::{
-    fs,
-    path::{PathBuf},
-    process,
-};
+use std::{fs, path::PathBuf, process};
 
 #[derive(Parser)]
 #[clap(name = "music", author)]
@@ -26,7 +22,6 @@ enum Commands {
         /// the folder to save to
         folder: String,
     },
-    /// returns the location of the config path
     // #[clap(external_subcommand)]
     // External(Vec<String>)
     Play {
@@ -44,8 +39,8 @@ enum Commands {
         limit: Option<i32>,
         #[clap(long)]
         persist: bool,
-        #[clap(long)]
-        vlc_path: Option<String>,
+        #[clap(long, default_value = "vlc")]
+        vlc_path: String,
         #[clap(long, default_value = "modified")]
         /// values: a, m, c
         sort_type: String,
@@ -54,7 +49,6 @@ enum Commands {
 }
 
 fn does_song_pass(terms: &Vec<String>, music_path: &PathBuf, song_path: &PathBuf) -> bool {
-    println!("{:?}", terms);
     if terms.len() == 0 {
         return true;
     }
@@ -180,11 +174,6 @@ fn main() -> Result<()> {
             let has_limit = limit.is_some();
             let limit: usize = limit.unwrap_or(500).try_into().unwrap();
 
-            let vlc_path = match vlc_path {
-                Some(val) => val.as_str(),
-                None => "vlc",
-            };
-
             if !has_limit && terms.len() == 0 && !dry_paths && !play_new_first && !new {
                 println!("Playing all songs");
 
@@ -262,7 +251,7 @@ fn main() -> Result<()> {
                 songs.push("--no-random".to_owned());
             }
 
-            play_vlc(&music_path, vlc_path, &songs, *dry_run, *persist)?;
+            play_vlc(&music_path, &vlc_path, &songs, *dry_run, *persist)?;
         }
     };
 
