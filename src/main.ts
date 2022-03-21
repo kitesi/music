@@ -18,10 +18,9 @@ function logErrors(reason: any) {
 }
 
 const promiseBasedExec = promisify(realExec);
-let isDryRun = false;
 let exec = promiseBasedExec;
 
-const timeoutTillExit = isDryRun ? 0 : 1200;
+let timeoutTillExit = 1200;
 
 function doesSongPass(terms: string[], songPath: string): boolean {
     if (terms.length === 0) {
@@ -332,9 +331,7 @@ yargs(process.argv.slice(2))
     .alias('h', 'help')
     // @ts-expect-error
     .middleware((args: DefaultCommandArgs) => {
-        isDryRun = args['dry-run'];
-
-        if (isDryRun) {
+        if (args['dry-run']) {
             // @ts-expect-error
             exec = () => {
                 const promise = Object.assign(new Promise((res) => res), {
@@ -346,6 +343,8 @@ yargs(process.argv.slice(2))
 
                 return promise;
             };
+
+            timeoutTillExit = 0;
         }
 
         if (typeof args.persist !== 'undefined') {
