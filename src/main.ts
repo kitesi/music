@@ -174,27 +174,11 @@ async function defaultCommandHandler(args: DefaultCommandArgs) {
         console.log('Playing all songs');
     } else {
         const playingMessage = `Playing: [${songs.length}]`;
-        const artistsDict: { [k: string]: string[] } = {};
 
-        for (const song of songs) {
-            const [artist, songName] = song.split('/');
-
-            if (!(artist in artistsDict)) {
-                artistsDict[artist] = [songName];
-            } else {
-                artistsDict[artist].push(songName);
-            }
-        }
-
-        console.log(playingMessage + '\n');
-
-        for (const [artist, songsFromArtist] of Object.entries(artistsDict)) {
-            console.log(
-                chalk.blue(`- ${artist} [${songsFromArtist.length}]\n\n`) +
-                    songsFromArtist.map((e) => '  - ' + e).join('\n') +
-                    '\n'
-            );
-        }
+        console.log(
+            `${playingMessage}\n` +
+                songs.map((e) => chalk.redBright('- ' + e)).join('\n')
+        );
     }
 
     exec(
