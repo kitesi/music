@@ -20,7 +20,7 @@ function logErrors(reason: any) {
 
 const promiseBasedExec = promisify(realExec);
 let exec = promiseBasedExec;
-let timeoutTillExit = 1200;
+let timeoutTillExit = 100;
 
 function doesSongPass(terms: string[], songPath: string): boolean {
     if (terms.length === 0) {
