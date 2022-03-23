@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import { config } from './config.js';
 import path from 'path';
 import yargs from 'yargs';
+import yargsParser from 'yargs-parser';
 import chalk from 'chalk';
 
 let songsPath = config.get('path') as string;
@@ -112,6 +113,7 @@ interface DefaultCommandArgs {
     limit: number;
     new: boolean;
     persist?: boolean;
+    live?: boolean;
     'dry-run': boolean;
     'dry-paths': boolean;
     'play-new-first': boolean;
@@ -121,24 +123,7 @@ interface DefaultCommandArgs {
     'sort-type': 'a' | 'c' | 'm';
 }
 
-async function defaultCommandHandler(args: DefaultCommandArgs) {
-    if (
-        (!args.terms || args.terms.length === 0) &&
-        !args.limit &&
-        !args['dry-paths'] &&
-        !args['play-new-first'] &&
-        !args.new
-    ) {
-        console.log('Playing all songs');
-        exec(`${vlcPath} --recursive=expand "${songsPath}"`);
-
-        if (persist) {
-            return;
-        }
-
-        return setTimeout(() => process.exit(0), timeoutTillExit);
-    }
-
+function getSongs(args: DefaultCommandArgs) {
     let songs = getSongsByTerms(
         args.terms || [],
         // only give a limit if there is no need for sorting
@@ -148,7 +133,7 @@ async function defaultCommandHandler(args: DefaultCommandArgs) {
     );
 
     if (songs.length === 0) {
-        return console.error("Didn't match anything");
+        return [];
     }
 
     if (args.new || args['delete-old-first']) {
@@ -164,23 +149,115 @@ async function defaultCommandHandler(args: DefaultCommandArgs) {
         songs.sort(sortByNew);
     }
 
-    if (args['dry-paths']) {
-        return console.log(
-            songs.map((s) => path.join(songsPath, s)).join('\n')
-        );
-    }
+    return songs;
+}
 
-    if (!args.limit && (!args.terms || args.terms.length === 0)) {
-        console.log('Playing all songs');
-    } else {
-        const playingMessage = `Playing: [${songs.length}]`;
+function writeToScreen(query: string, msg: string) {
+    process.stdout.write('\r');
+    process.stdout.clearScreenDown();
 
-        console.log(
-            `${playingMessage}\n` +
-                songs.map((e) => chalk.redBright('- ' + e)).join('\n')
-        );
-    }
+    const queryMessage = 'Search: ' + query;
 
+    process.stdout.write(
+        queryMessage + '\n-----------------------\n' + msg + '\n'
+    );
+
+    process.stdout.moveCursor(
+        queryMessage.length,
+        -(msg.split('\n').length + 2)
+    );
+}
+
+async function liveQueryResults() {
+    const { stdin } = process;
+
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+
+    let query = '';
+    let lastMessage = '';
+    let lastSongs: string[] = [];
+    // @ts-expect-error
+    let lastArgsFromQuery: DefaultCommandArgs = {};
+
+    writeToScreen('', '');
+
+    stdin.on('data', async function (key: string) {
+        let prevQuery = query;
+
+        // ctrl-c
+        if (key === '\u0003') {
+            process.stdout.moveCursor(0, -lastMessage.split('\n').length + 1);
+
+            process.stdout.write('\r');
+            process.stdout.clearScreenDown();
+
+            process.exit();
+        }
+
+        // backspace
+        if (key === '\x7F') {
+            query = query.slice(0, query.length - 1);
+        }
+
+        // ctrl-u
+        if (key === '\x15') {
+            query = '';
+        }
+
+        // ctrl-w
+        if (key === '\x17') {
+            const words = query.split(/ /);
+            query = words.slice(0, words.length - 1).join(' ');
+        }
+
+        if (key === '\r') {
+            process.stdout.write('\r');
+            process.stdout.clearScreenDown();
+            playMusic(lastSongs, lastArgsFromQuery);
+            playingMusicMessage(lastSongs);
+
+            await new Promise((res) =>
+                setTimeout(() => process.exit(), timeoutTillExit)
+            );
+        }
+
+        const asciiCode = key.charCodeAt(0);
+
+        if (asciiCode < 32 || asciiCode > 126) {
+            if (query === prevQuery) {
+                return;
+            }
+        } else {
+            query += key;
+        }
+
+        // @ts-expect-error
+        const argsFromQuery = yargsParser(query, {}) as DefaultCommandArgs;
+        // @ts-expect-error
+        argsFromQuery.terms = argsFromQuery._;
+
+        const songs = getSongs(argsFromQuery);
+        // writeFileSync(
+        //     './temp',
+        //     JSON.stringify(argsFromQuery) + '\n' + JSON.stringify(songs)
+        // );
+        const msg = songs.slice(0, 20).join('\n');
+
+        writeToScreen(query, msg);
+
+        lastSongs = songs;
+        lastMessage = msg;
+        lastArgsFromQuery = argsFromQuery;
+    });
+
+    return new Promise<void>((res) => {
+        stdin.on('end', () => res());
+    });
+}
+
+function playMusic(songs: string[], args: DefaultCommandArgs) {
     exec(
         `${vlcPath} ${songs
             .map(
@@ -191,6 +268,60 @@ async function defaultCommandHandler(args: DefaultCommandArgs) {
             )
             .join(' ')}`
     ).catch(logErrors);
+}
+
+function playingMusicMessage(songs: string[]) {
+    const playingMessage = `Playing: [${songs.length}]`;
+
+    console.log(
+        `${playingMessage}\n` +
+            songs.map((e) => chalk.redBright('- ' + e)).join('\n')
+    );
+}
+
+async function defaultCommandHandler(args: DefaultCommandArgs) {
+    if (
+        (!args.terms || args.terms.length === 0) &&
+        !args.limit &&
+        !args['dry-paths'] &&
+        !args['play-new-first'] &&
+        !args.new &&
+        !args.live
+    ) {
+        console.log('Playing all songs');
+        exec(`${vlcPath} --recursive=expand "${songsPath}"`);
+
+        if (persist) {
+            return;
+        }
+
+        return setTimeout(() => process.exit(0), timeoutTillExit);
+    }
+
+    if (args.live) {
+        await liveQueryResults();
+        process.exit();
+    }
+
+    const songs = getSongs(args);
+
+    if (songs.length === 0) {
+        return console.error("Didn't match anything");
+    }
+
+    if (args['dry-paths']) {
+        return console.log(
+            songs.map((s) => path.join(songsPath, s)).join('\n')
+        );
+    }
+
+    if (!args.limit && (!args.terms || args.terms.length === 0)) {
+        console.log('Playing all songs');
+    } else {
+        playingMusicMessage(songs);
+    }
+
+    playMusic(songs, args);
 
     if (!persist) {
         setTimeout(() => process.exit(0), timeoutTillExit);
@@ -229,6 +360,10 @@ yargs(process.argv.slice(2))
                 })
                 .option('persist', {
                     type: 'boolean',
+                })
+                .option('live', {
+                    type: 'boolean',
+                    describe: 'get live query results with stdin input',
                 })
                 .option('vlc-path', {
                     type: 'string',
