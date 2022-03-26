@@ -1,64 +1,24 @@
 #!/usr/bin/env node
-import type { Argv } from 'yargs';
-
 import { statSync, readdirSync } from 'fs';
 import { exec as realExec } from 'child_process';
 import { promisify } from 'util';
-import { config } from './config.js';
 import path from 'path';
 import yargs from 'yargs';
-import chalk from 'chalk';
+
+import { config } from './config.js';
+import { doesSongPass } from './does-song-pass.js';
+import * as playMusic from './play-music.js';
+
+import type { PlayMusicArgs } from './play-music.js';
 
 let songsPath = config.get('path') as string;
 let vlcPath = config.get('pathToVLC') as string;
 let persist = config.get('persist') as boolean;
 let sortType = config.get('sortType') as 'atimeMs' | 'ctimeMs' | 'mtimeMs';
 
-function logErrors(reason: any) {
-    console.error('Error: ' + (reason?.message || `\n\n${reason}`));
-}
-
 const promiseBasedExec = promisify(realExec);
 let exec = promiseBasedExec;
 let timeoutTillExit = 100;
-
-function doesSongPass(terms: string[], songPath: string): boolean {
-    if (terms.length === 0) {
-        return true;
-    }
-
-    let passedOneTerm = false;
-
-    for (let term of terms) {
-        term = term.toLowerCase();
-
-        const isExclusion = term.startsWith('!');
-
-        if (isExclusion) {
-            term = term.slice(1);
-        }
-
-        const requiredSections = term.split(/#\s*/);
-
-        if (
-            requiredSections.every((s) =>
-                s.split(/,\s*/).some((w) => songPath.includes(w))
-            )
-        ) {
-            if (isExclusion) {
-                return false;
-            }
-
-            passedOneTerm = true;
-        }
-    }
-
-    if (terms.every((t) => t.startsWith('!'))) {
-        return true;
-    }
-
-    return passedOneTerm;
-}
 
 function getSongsByTerms(terms: string[], limit?: number) {
     const chosenSongs: string[] = [];
@@ -108,22 +68,7 @@ function sortByNew(a: string, b: string) {
 
 // const line = '─'.repeat(60);
 
-interface DefaultCommandArgs {
-    terms?: string[];
-    limit: number;
-    new: boolean;
-    persist?: boolean;
-    live?: boolean;
-    'dry-run': boolean;
-    'dry-paths': boolean;
-    'play-new-first': boolean;
-    'delete-old-first': boolean;
-    'vlc-path': string;
-    'songs-path': string;
-    'sort-type': 'a' | 'c' | 'm';
-}
-
-function getSongs(args: DefaultCommandArgs) {
+function getSongs(args: PlayMusicArgs) {
     let songs = getSongsByTerms(
         args.terms || [],
         // only give a limit if there is no need for sorting
@@ -176,10 +121,9 @@ async function liveQueryResults() {
     stdin.setEncoding('utf8');
 
     let query = '';
-    let lastMessage = '';
     let lastSongs: string[] = [];
     // @ts-expect-error
-    let lastArgsFromQuery: DefaultCommandArgs = {};
+    let lastArgsFromQuery: PlayMusicArgs = {};
 
     writeToScreen('', '');
 
@@ -189,7 +133,7 @@ async function liveQueryResults() {
         .command({
             command: '$0 [terms..]',
             describe: '',
-            builder: playMusicBuilder,
+            builder: playMusic.builder,
             handler: () => {},
         })
         .help(false)
@@ -231,8 +175,14 @@ async function liveQueryResults() {
                 process.exit(0);
             }
 
-            playMusic(lastSongs, lastArgsFromQuery);
-            playingMusicMessage(lastSongs);
+            playMusic.run({
+                args: lastArgsFromQuery,
+                exec,
+                songs: lastSongs,
+                songsPath,
+                vlcPath,
+            });
+            playMusic.message(lastSongs);
 
             await new Promise((res) =>
                 setTimeout(() => process.exit(), timeoutTillExit)
@@ -257,7 +207,7 @@ async function liveQueryResults() {
                 writeToScreen(query, msg);
                 lastSongs = [];
             })
-            .parse(query) as DefaultCommandArgs;
+            .parse(query) as PlayMusicArgs;
 
         if (hasError) {
             return;
@@ -269,7 +219,6 @@ async function liveQueryResults() {
         writeToScreen(query, msg);
 
         lastSongs = songs;
-        lastMessage = msg;
         lastArgsFromQuery = argsFromQuery;
     });
 
@@ -278,29 +227,7 @@ async function liveQueryResults() {
     });
 }
 
-function playMusic(songs: string[], args: DefaultCommandArgs) {
-    exec(
-        `${vlcPath} ${songs
-            .map(
-                (s) =>
-                    `"${songsPath}/${s}" ${
-                        args.new || args['play-new-first'] ? '--no-random' : ''
-                    }`
-            )
-            .join(' ')}`
-    ).catch(logErrors);
-}
-
-function playingMusicMessage(songs: string[]) {
-    const playingMessage = `Playing: [${songs.length}]`;
-
-    console.log(
-        `${playingMessage}\n` +
-            songs.map((e) => chalk.redBright('- ' + e)).join('\n')
-    );
-}
-
-async function defaultCommandHandler(args: DefaultCommandArgs) {
+async function defaultCommandHandler(args: PlayMusicArgs) {
     if (
         (!args.terms || args.terms.length === 0) &&
         !args.limit &&
@@ -339,70 +266,21 @@ async function defaultCommandHandler(args: DefaultCommandArgs) {
     if (!args.limit && (!args.terms || args.terms.length === 0)) {
         console.log('Playing all songs');
     } else {
-        playingMusicMessage(songs);
+        playMusic.message(songs);
     }
 
-    playMusic(songs, args);
+    playMusic.run({ args, exec, songs, songsPath, vlcPath });
 
     if (!persist) {
         setTimeout(() => process.exit(0), timeoutTillExit);
     }
 }
 
-function playMusicBuilder(y: Argv) {
-    return y
-        .option('dry-run', {
-            alias: 'd',
-            type: 'boolean',
-        })
-        .option('limit', {
-            alias: 'l',
-            type: 'number',
-        })
-        .option('new', {
-            alias: 'n',
-            type: 'boolean',
-        })
-        .option('play-new-first', {
-            type: 'boolean',
-            alias: 'pnf',
-        })
-        .option('delete-old-first', {
-            type: 'boolean',
-            alias: 'dof',
-        })
-        .option('dry-paths', {
-            type: 'boolean',
-            alias: 'p',
-        })
-        .option('persist', {
-            type: 'boolean',
-        })
-        .option('live', {
-            type: 'boolean',
-            describe: 'get live query results with stdin input',
-        })
-        .option('vlc-path', {
-            type: 'string',
-        })
-        .option('sort-type', {
-            type: 'string',
-            choices: ['a', 'm', 'c'],
-        })
-        .option('songs-path', {
-            type: 'string',
-        })
-        .positional('terms', {
-            type: 'string',
-            array: true,
-        });
-}
-
 yargs(process.argv.slice(2))
     .command({
         command: ['play [terms..]', 'p'],
         describe: 'play music',
-        builder: playMusicBuilder,
+        builder: playMusic.builder,
         // @ts-ignore
         handler: defaultCommandHandler,
     })
@@ -488,7 +366,7 @@ yargs(process.argv.slice(2))
     })
     .alias('h', 'help')
     // @ts-expect-error
-    .middleware((args: DefaultCommandArgs) => {
+    .middleware((args: PlayMusicArgs) => {
         if (args['dry-run']) {
             // @ts-expect-error
             exec = () => {
