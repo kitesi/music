@@ -142,51 +142,48 @@ async function liveQueryResults() {
     stdin.on('data', async function (key: string) {
         let prevQuery = query;
 
-        // ctrl-c
-        if (key === '\u0003') {
-            process.stdout.write('\r');
-            process.stdout.clearScreenDown();
+        switch (key) {
+            // ctrl-c
+            case '\u0003':
+                process.stdout.write('\r');
+                process.stdout.clearScreenDown();
 
-            process.exit();
-        }
+                process.exit();
+            // backspace
+            case '\x7F':
+                query = query.slice(0, query.length - 1);
+                break;
+            // ctrl-u
+            case '\x15':
+                query = '';
+                break;
+            // ctrl-w
+            case '\x17':
+                const words = query.split(/ /);
+                query = words.slice(0, words.length - 1).join(' ');
+                break;
+            case '\r':
+                process.stdout.write('\r');
+                process.stdout.clearScreenDown();
 
-        // backspace
-        if (key === '\x7F') {
-            query = query.slice(0, query.length - 1);
-        }
+                if (lastSongs.length === 0) {
+                    console.log('No songs selected.');
+                    process.exit(0);
+                }
 
-        // ctrl-u
-        if (key === '\x15') {
-            query = '';
-        }
+                playMusic.run({
+                    args: lastArgsFromQuery,
+                    exec,
+                    songs: lastSongs,
+                    songsPath,
+                    vlcPath,
+                });
+                playMusic.message(lastSongs);
 
-        // ctrl-w
-        if (key === '\x17') {
-            const words = query.split(/ /);
-            query = words.slice(0, words.length - 1).join(' ');
-        }
-
-        if (key === '\r') {
-            process.stdout.write('\r');
-            process.stdout.clearScreenDown();
-
-            if (lastSongs.length === 0) {
-                console.log('No songs selected.');
-                process.exit(0);
-            }
-
-            playMusic.run({
-                args: lastArgsFromQuery,
-                exec,
-                songs: lastSongs,
-                songsPath,
-                vlcPath,
-            });
-            playMusic.message(lastSongs);
-
-            await new Promise((res) =>
-                setTimeout(() => process.exit(), timeoutTillExit)
-            );
+                await new Promise((res) =>
+                    setTimeout(() => process.exit(), timeoutTillExit)
+                );
+                break;
         }
 
         const asciiCode = key.charCodeAt(0);
