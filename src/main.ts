@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import type { Argv } from 'yargs';
 
 import { statSync, readdirSync } from 'fs';
 import { exec as realExec } from 'child_process';
@@ -6,7 +7,6 @@ import { promisify } from 'util';
 import { config } from './config.js';
 import path from 'path';
 import yargs from 'yargs';
-import yargsParser from 'yargs-parser';
 import chalk from 'chalk';
 
 let songsPath = config.get('path') as string;
@@ -183,6 +183,18 @@ async function liveQueryResults() {
 
     writeToScreen('', '');
 
+    const parser = yargs()
+        // idk the typing is off for yargs
+        // @ts-expect-error
+        .command({
+            command: '$0 [terms..]',
+            describe: '',
+            builder: playMusicBuilder,
+            handler: () => {},
+        })
+        .help(false)
+        .strict(true);
+
     stdin.on('data', async function (key: string) {
         let prevQuery = query;
 
@@ -233,16 +245,24 @@ async function liveQueryResults() {
             query += key;
         }
 
-        // @ts-expect-error
-        const argsFromQuery = yargsParser(query, {}) as DefaultCommandArgs;
+        let hasError = false;
+
+        const argsFromQuery = parser
+            .fail((msg: string) => {
+                hasError = true;
+                writeToScreen(query, msg);
+                lastSongs = [];
+            })
+            .parse(query) as DefaultCommandArgs;
+
+        if (hasError) {
+            return;
+        }
+
         // @ts-expect-error
         argsFromQuery.terms = argsFromQuery._;
 
         const songs = getSongs(argsFromQuery);
-        // writeFileSync(
-        //     './temp',
-        //     JSON.stringify(argsFromQuery) + '\n' + JSON.stringify(songs)
-        // );
         const msg = songs.slice(0, 20).join('\n');
 
         writeToScreen(query, msg);
@@ -328,57 +348,60 @@ async function defaultCommandHandler(args: DefaultCommandArgs) {
     }
 }
 
+function playMusicBuilder(y: Argv) {
+    return y
+        .option('dry-run', {
+            alias: 'd',
+            type: 'boolean',
+        })
+        .option('limit', {
+            alias: 'l',
+            type: 'number',
+        })
+        .option('new', {
+            alias: 'n',
+            type: 'boolean',
+        })
+        .option('play-new-first', {
+            type: 'boolean',
+            alias: 'pnf',
+        })
+        .option('delete-old-first', {
+            type: 'boolean',
+            alias: 'dof',
+        })
+        .option('dry-paths', {
+            type: 'boolean',
+            alias: 'p',
+        })
+        .option('persist', {
+            type: 'boolean',
+        })
+        .option('live', {
+            type: 'boolean',
+            describe: 'get live query results with stdin input',
+        })
+        .option('vlc-path', {
+            type: 'string',
+        })
+        .option('sort-type', {
+            type: 'string',
+            choices: ['a', 'm', 'c'],
+        })
+        .option('songs-path', {
+            type: 'string',
+        })
+        .positional('terms', {
+            type: 'string',
+            array: true,
+        });
+}
+
 yargs(process.argv.slice(2))
     .command({
         command: ['play [terms..]', 'p'],
         describe: 'play music',
-        builder: (y) =>
-            y
-                .option('dry-run', {
-                    alias: 'd',
-                    type: 'boolean',
-                })
-                .option('limit', {
-                    alias: 'l',
-                    type: 'number',
-                })
-                .option('new', {
-                    alias: 'n',
-                    type: 'boolean',
-                })
-                .option('play-new-first', {
-                    type: 'boolean',
-                    alias: 'pnf',
-                })
-                .option('delete-old-first', {
-                    type: 'boolean',
-                    alias: 'dof',
-                })
-                .option('dry-paths', {
-                    type: 'boolean',
-                    alias: 'p',
-                })
-                .option('persist', {
-                    type: 'boolean',
-                })
-                .option('live', {
-                    type: 'boolean',
-                    describe: 'get live query results with stdin input',
-                })
-                .option('vlc-path', {
-                    type: 'string',
-                })
-                .option('sort-type', {
-                    type: 'string',
-                    choices: ['a', 'm', 'c'],
-                })
-                .option('songs-path', {
-                    type: 'string',
-                })
-                .positional('terms', {
-                    type: 'string',
-                    array: true,
-                }),
+        builder: playMusicBuilder,
         // @ts-ignore
         handler: defaultCommandHandler,
     })
