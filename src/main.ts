@@ -200,8 +200,6 @@ async function liveQueryResults() {
 
         // ctrl-c
         if (key === '\u0003') {
-            process.stdout.moveCursor(0, -lastMessage.split('\n').length + 1);
-
             process.stdout.write('\r');
             process.stdout.clearScreenDown();
 
@@ -227,6 +225,12 @@ async function liveQueryResults() {
         if (key === '\r') {
             process.stdout.write('\r');
             process.stdout.clearScreenDown();
+
+            if (lastSongs.length === 0) {
+                console.log('No songs selected.');
+                process.exit(0);
+            }
+
             playMusic(lastSongs, lastArgsFromQuery);
             playingMusicMessage(lastSongs);
 
@@ -258,9 +262,6 @@ async function liveQueryResults() {
         if (hasError) {
             return;
         }
-
-        // @ts-expect-error
-        argsFromQuery.terms = argsFromQuery._;
 
         const songs = getSongs(argsFromQuery);
         const msg = songs.slice(0, 20).join('\n');
