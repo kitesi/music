@@ -400,7 +400,7 @@ yargs(process.argv.slice(2))
         }
 
         if (args['songs-path']) {
-            songsPath = path.join(process.cwd(), args['songs-path']);
+            songsPath = path.resolve(args['songs-path']);
         }
 
         if (args['sort-type']) {
