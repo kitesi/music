@@ -66,8 +66,6 @@ function sortByNew(a: string, b: string) {
     return songBStats[sortType] - songAStats[sortType];
 }
 
-// const line = '─'.repeat(60);
-
 function getSongs(args: PlayMusicArgs) {
     let songs = getSongsByTerms(
         args.terms || [],
@@ -115,6 +113,7 @@ function writeToScreen(query: string, msg: string) {
 
 async function liveQueryResults() {
     const { stdin } = process;
+    const wordsRegex = /[\s+#,]/g;
 
     stdin.setRawMode(true);
     stdin.resume();
@@ -159,8 +158,19 @@ async function liveQueryResults() {
                 break;
             // ctrl-w
             case '\x17':
-                const words = query.split(/ /);
-                query = words.slice(0, words.length - 1).join(' ');
+                let words = query.trimEnd().split(wordsRegex);
+                const seperators = query.match(wordsRegex);
+
+                words = words.slice(0, words.length - 1);
+                query = '';
+
+                for (let i = 0; i < words.length; i++) {
+                    query += words[i];
+
+                    if (i != words.length - 1 && seperators && seperators[i]) {
+                        query += seperators[i];
+                    }
+                }
                 break;
             case '\r':
                 process.stdout.write('\r');
@@ -178,6 +188,7 @@ async function liveQueryResults() {
                     songsPath,
                     vlcPath,
                 });
+
                 playMusic.message(lastSongs);
 
                 await new Promise((res) =>
@@ -224,7 +235,7 @@ async function liveQueryResults() {
     });
 }
 
-async function defaultCommandHandler(args: PlayMusicArgs) {
+async function playMusicHandler(args: PlayMusicArgs) {
     if (
         (!args.terms || args.terms.length === 0) &&
         !args.limit &&
@@ -279,7 +290,7 @@ yargs(process.argv.slice(2))
         describe: 'play music',
         builder: playMusic.builder,
         // @ts-ignore
-        handler: defaultCommandHandler,
+        handler: playMusicHandler,
     })
     .command({
         command: 'get-config-path',
