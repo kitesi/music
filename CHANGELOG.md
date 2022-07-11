@@ -1,3 +1,28 @@
+# 1.8.0 (7/11/22)
+
+<!-- prettier-ignore -->
+- add `--live` option, this allows you to type out your query and get live feedback
+for the songs it will play
+- add `-e | --editor` option to modify song list before playing
+
+  this option will create a temporary file and then execute your ENV's
+  default editor and after you finish saving and exiting will read the
+  file content and play the songs based of it
+
+  inspired by rangers `:bulkrename`
+
+- add `-e | --editor` option to modify song name before installing
+  
+  this will fetch the title using open-graph-scraper and then just like before 
+  create a temporary file and use your ENV's editor. 
+
+  ".%(ext)s" is added afterwards.
+
+  can not be used in combination with `-n | --name`
+- add alias `-s` for `--sort-type`
+- fix `--songs-path` argument
+- add completions for `mx` alias if you choose to have that
+
 # 1.7.0 (1/23/22)
 
 <!-- prettier-ignore -->

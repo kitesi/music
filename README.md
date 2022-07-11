@@ -119,6 +119,23 @@ Flairs:
 
 `--new | -n` => `--delete-old-first` and `--play-new-first`
 
+`--persist` => persist the instance of vlc
+
+`--live` => this allows you to type out your query and get live feedback
+for the songs it will play
+
+`--editor` => option to modify song list before playing
+
+this option will create a temporary file and then execute your ENV's
+default editor and after you finish saving and exiting will read the
+file content and play the songs based of it
+
+`--vlc-path <string>` => specifies the path to vlc to use
+
+`--songs-path <string>` => specifies the songs path to use
+
+`--sort-type | -s <a|m|c>` => specifies the what timestamp to use (access, modified, changed)
+
 ### Installing music
 
 `music install "https://www.youtube.com/watch?v=K4DyBUG242c" ncs` => download from youtube
@@ -134,13 +151,18 @@ Flairs:
 `--format | -f` => specify what format to download with, default is m4a. All the allowed formats are just what ytdl allows. Currently it is `3gp`, `aac`, `flv`, `m4a`, `mp3`, `mp4`, `ogg`, `wav`, `webm`
 `--ytdl-args | -y` => specify any ytdl args to add to the command, example: `--ytdl-args "-4"`
 `--name | -n` => specify the file name
+`--editor | -e` => opens your editor so you can modify the title before installing. is a bit slower since it needs to fetch the title
 
 ### Auto Completion
 
 If you are using bash you can add the following in your `.bashrc`. I think it's pretty
 thorough but if you think there should be more you can create an issue.
 
+Note: I use `mx` as an alias for `music play`
+
 ```bash
+MUSIC_PLAY_OPTIONS="--help --version --live --editor --dry-paths --play-new-first --delete-old-first --persist --vlc-path --sort-type --songs-path --dry-run --limit --new --pnf --dof --no-persist -h -n -d -l -p -s"
+
 _music_completions()
 {
     local cur_word="${COMP_WORDS[COMP_CWORD]}"
@@ -164,18 +186,28 @@ _music_completions()
         # depending how up to date you want this to be, you can set this variable outside of
         # this function (global scope). It's still pretty fast for me so I personally won't
         local SONGS_SUB_DIRS=$(basename -a ~/Music/*/ | sed 's/ /-/g' | awk '{print tolower($0)}' | tr '\n' ' ')
-        COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}--format --ytdl-args --name -f -y -n" -- ${cur_word}) )
+        COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}--format --ytdl-args --name --editor -e -f -y -n" -- ${cur_word}) )
     elif [ "$prev_word" = "--sort-type" ]; then
         COMPREPLY=( $(compgen -W "a c m" -- ${cur_word}) )
     elif [ "$prev_word" = "--songs-path" ] || [ "$prev_word" = "--vlc-path" ]; then
         COMPREPLY=()
     else
-        local generic_options="install play get-config-path --help --version --dry-paths --play-new-first --delete-old-first --persist --vlc-path --sort-type --songs-path --dry-run --limit --new --pnf --dof --no-persist -h -n -d -l -p"
+        local generic_options="install play get-config-path ${MUSIC_PLAY_OPTIONS}"
         COMPREPLY=( $(compgen -W "${generic_options}" -- ${cur_word}) )
     fi
 
     return 0
 }
+
+_music_play_completions() {
+    local cur_word="${COMP_WORDS[COMP_CWORD]}"
+
+    COMPREPLY=( $(compgen -W "${MUSIC_PLAY_OPTIONS}" -- ${cur_word}) )
+    return 0
+}
+
+complete -F _music_completions -o default music
+complete -F _music_play_completions -o default mx
 ```
 
 ### Android
@@ -205,7 +237,6 @@ Now you can run mx like so: `mx jacob`
 ## Plans
 
 <!-- prettier-ignore -->
-- Faster, (currently uses a lot of sync functions)
 - Tests
 - Config
   - Colors
@@ -217,4 +248,3 @@ Now you can run mx like so: `mx jacob`
 - Playlists?
 - Tags?
   - Maybe using file metadata, having to add it manually would be a pain
-- Command: `music ls`
