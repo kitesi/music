@@ -3,12 +3,12 @@ import { statSync, readdirSync } from 'fs';
 import { exec as realExec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
-import yargs from 'yargs';
+import yargs, { option } from 'yargs';
 
 import { config } from './config.js';
 import { doesSongPass } from './does-song-pass.js';
 import * as playMusic from './play-music.js';
-import pipeThroughEditor from './pipe-through-editor.js';
+import { editSongInstallName, editSongList } from './pipe-through-editor.js';
 
 import type { PlayMusicArgs } from './play-music.js';
 
@@ -94,7 +94,7 @@ async function getSongs(args: PlayMusicArgs) {
     }
 
     if (args.editor) {
-        return await pipeThroughEditor(songs);
+        return await editSongList(songs);
     }
 
     return songs;
@@ -322,21 +322,28 @@ yargs(process.argv.slice(2))
                 .option('name', {
                     type: 'string',
                     alias: 'n',
-                });
+                })
+                .option('editor', {
+                    type: 'boolean',
+                    alias: 'e',
+                })
+                .conflicts('editor', 'name');
         },
         // @ts-expect-error
-        handler: ({
+        handler: async ({
             folder,
             id,
             format,
             'ytdl-args': ytdlArgs,
             name: fileName,
+            editor,
         }: {
             folder: string;
             id: string;
             format?: string;
             'ytdl-args'?: string;
             name?: string;
+            editor?: boolean;
         }) => {
             const possibleFolders = readdirSync(songsPath);
             const adjustedFolder = folder.toLowerCase().replace(/\s+/g, '-');
@@ -360,11 +367,20 @@ yargs(process.argv.slice(2))
                 ? id
                 : `https://www.youtube.com/watch?v=${id}`;
 
+            let outputTemplate = fileName
+                ? fileName + '.%(ext)s'
+                : '%(title)s.%(ext)s';
+
+            if (editor) {
+                outputTemplate =
+                    (await editSongInstallName(youtubeURL)) + '.%(ext)s';
+            }
+
             const child = exec(
                 `youtube-dl -f ${format} -o "${path.join(
                     songsPath,
                     selectedFolder,
-                    (fileName && fileName + '.%(ext)s') || '%(title)s.%(ext)s'
+                    outputTemplate
                 )}" ${ytdlArgs} -- "${youtubeURL}"`
             ).child;
 
