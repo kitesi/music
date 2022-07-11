@@ -62,6 +62,7 @@ export function builder(y: Argv) {
         .option('sort-type', {
             type: 'string',
             choices: ['a', 'm', 'c'],
+            alias: 's',
         })
         .option('songs-path', {
             type: 'string',
