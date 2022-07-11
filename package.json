@@ -1,6 +1,6 @@
 {
     "name": "@karizma/music",
-    "version": "1.8.0",
+    "version": "1.9.0",
     "description": "Simple music cli that works with local files. Does not include a tui, or interactive mode.",
     "bin": {
         "music": "dist/main.js"
@@ -27,7 +27,8 @@
         "chalk": "^4.1.1",
         "conf": "^10.0.3",
         "env-paths": "^3.0.0",
-        "yargs": "^17.0.1"
+        "yargs": "^17.0.1",
+        "open-graph-scraper": "^4.11.1"
     },
     "repository": {
         "type": "git",
@@ -38,7 +39,6 @@
     },
     "homepage": "https://github.com/karizma/music-cli#readme",
     "devDependencies": {
-        "@types/open-graph-scraper": "^4.8.1",
-        "open-graph-scraper": "^4.11.1"
+        "@types/open-graph-scraper": "^4.8.1"
     }
 }

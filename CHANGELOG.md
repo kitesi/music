@@ -1,3 +1,8 @@
+# 1.9.0 (7/11/22)
+
+<!-- prettier-ignore -->
+- moved `open-graph-scraper` to dependency intead of dev
+
 # 1.8.0 (7/11/22)
 
 <!-- prettier-ignore -->
