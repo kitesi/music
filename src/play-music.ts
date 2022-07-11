@@ -3,11 +3,12 @@ import type { Argv } from 'yargs';
 import chalk from 'chalk';
 
 export interface PlayMusicArgs {
-    terms?: string[];
+    terms: string[];
     limit: number;
     new: boolean;
     persist?: boolean;
     live?: boolean;
+    editor?: boolean;
     'dry-run': boolean;
     'dry-paths': boolean;
     'play-new-first': boolean;
@@ -49,6 +50,11 @@ export function builder(y: Argv) {
         .option('live', {
             type: 'boolean',
             describe: 'get live query results with stdin input',
+        })
+        .option('editor', {
+            type: 'boolean',
+            describe: 'pipes songs through editor first',
+            alias: 'e',
         })
         .option('vlc-path', {
             type: 'string',

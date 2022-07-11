@@ -8,6 +8,7 @@ import yargs from 'yargs';
 import { config } from './config.js';
 import { doesSongPass } from './does-song-pass.js';
 import * as playMusic from './play-music.js';
+import pipeThroughEditor from './pipe-through-editor.js';
 
 import type { PlayMusicArgs } from './play-music.js';
 
@@ -66,7 +67,7 @@ function sortByNew(a: string, b: string) {
     return songBStats[sortType] - songAStats[sortType];
 }
 
-function getSongs(args: PlayMusicArgs) {
+async function getSongs(args: PlayMusicArgs) {
     let songs = getSongsByTerms(
         args.terms || [],
         // only give a limit if there is no need for sorting
@@ -90,6 +91,10 @@ function getSongs(args: PlayMusicArgs) {
     // !args.new && !args['delete-old-first'] to make sure we don't uselessly sort again
     if (args['play-new-first'] && !args.new && !args['delete-old-first']) {
         songs.sort(sortByNew);
+    }
+
+    if (args.editor) {
+        return await pipeThroughEditor(songs);
     }
 
     return songs;
@@ -221,7 +226,7 @@ async function liveQueryResults() {
             return;
         }
 
-        const songs = getSongs(argsFromQuery);
+        const songs = await getSongs(argsFromQuery);
         const msg = songs.slice(0, 20).join('\n');
 
         writeToScreen(query, msg);
@@ -237,14 +242,14 @@ async function liveQueryResults() {
 
 async function playMusicHandler(args: PlayMusicArgs) {
     if (
-        (!args.terms || args.terms.length === 0) &&
+        args.terms.length === 0 &&
         !args.limit &&
         !args['dry-paths'] &&
         !args['play-new-first'] &&
         !args.new &&
-        !args.live
+        !args.live &&
+        !args.editor
     ) {
-        console.log('Playing all songs');
         exec(`${vlcPath} --recursive=expand "${songsPath}"`);
 
         if (persist) {
@@ -259,7 +264,7 @@ async function playMusicHandler(args: PlayMusicArgs) {
         process.exit();
     }
 
-    const songs = getSongs(args);
+    const songs = await getSongs(args);
 
     if (songs.length === 0) {
         return console.error("Didn't match anything");
@@ -271,7 +276,7 @@ async function playMusicHandler(args: PlayMusicArgs) {
         );
     }
 
-    if (!args.limit && (!args.terms || args.terms.length === 0)) {
+    if (!args.limit && args.terms.length === 0 && !args.editor) {
         console.log('Playing all songs');
     } else {
         playMusic.message(songs);
