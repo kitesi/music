@@ -27,7 +27,6 @@ try {
             },
             sortType: {
                 type: 'string',
-                // pattern: '(a|c|m)timeMs',
                 enum: ['atimeMs', 'ctimeMs', 'mtimeMs'],
                 default: 'mtimeMs',
             },

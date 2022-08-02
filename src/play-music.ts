@@ -10,6 +10,8 @@ export interface PlayMusicArgs {
     persist: boolean;
     live?: boolean;
     editor?: boolean;
+    tags?: string[];
+    'add-to-tag'?: string;
     'dry-run'?: boolean;
     'dry-paths'?: boolean;
     'play-new-first'?: boolean;
@@ -60,8 +62,18 @@ export function builder(y: Argv) {
             describe: 'pipes songs through editor first',
             alias: 'e',
         })
+        .option('add-to-tag', {
+            type: 'string',
+            alias: 'a',
+        })
         .option('vlc-path', {
             type: 'string',
+        })
+
+        .option('tags', {
+            type: 'array',
+            alias: 't',
+            string: true,
         })
         .option('sort-type', {
             type: 'string',

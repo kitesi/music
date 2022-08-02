@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { statSync, readdirSync } from 'fs';
+import { readdirSync } from 'fs';
 import { exec as realExec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
@@ -12,6 +12,7 @@ import { getSongs } from './get-songs.js';
 import { liveQueryResults } from './live-query-results.js';
 
 import type { PlayMusicArgs } from './play-music.js';
+import { addTags } from './tags.js';
 
 const promiseBasedExec = promisify(realExec);
 let exec = promiseBasedExec;
@@ -52,6 +53,13 @@ async function playMusicHandler(args: PlayMusicArgs) {
     if (args['dry-paths']) {
         return console.log(
             songs.map((s) => path.join(songsPath, s)).join('\n')
+        );
+    }
+
+    if (args['add-to-tag']) {
+        addTags(
+            args['add-to-tag'],
+            songs.map((s) => s.toLowerCase())
         );
     }
 
