@@ -5,6 +5,7 @@ import chalk from 'chalk';
 export interface PlayMusicArgs {
     terms: string[];
     limit: number;
+    skip: number;
     new: boolean;
     persist?: boolean;
     live?: boolean;
@@ -26,6 +27,9 @@ export function builder(y: Argv) {
         })
         .option('limit', {
             alias: 'l',
+            type: 'number',
+        })
+        .option('skip', {
             type: 'number',
         })
         .option('new', {

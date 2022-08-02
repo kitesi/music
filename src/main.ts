@@ -3,7 +3,7 @@ import { statSync, readdirSync } from 'fs';
 import { exec as realExec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
-import yargs, { option } from 'yargs';
+import yargs from 'yargs';
 
 import { config } from './config.js';
 import { doesSongPass } from './does-song-pass.js';
@@ -21,8 +21,9 @@ const promiseBasedExec = promisify(realExec);
 let exec = promiseBasedExec;
 let timeoutTillExit = 100;
 
-function getSongsByTerms(terms: string[], limit?: number) {
+function getSongsByTerms(terms: string[], limit?: number, skip?: number) {
     const chosenSongs: string[] = [];
+    let skipped = 0;
 
     function walk(dir: string) {
         const files = readdirSync(dir);
@@ -40,14 +41,19 @@ function getSongsByTerms(terms: string[], limit?: number) {
                             .replace(songsPath.toLowerCase(), '')
                     )
                 ) {
+                    if (skip && skipped < skip) {
+                        skipped++;
+                        continue;
+                    }
+
+                    chosenSongs.push(
+                        nextPath.replace(songsPath + path.sep, '')
+                    );
+
                     // all the walk process-es that started will still run, idk
                     // how to early exit out of function from inner function
                     if (limit && chosenSongs.length === limit) {
                         return;
-                    } else {
-                        chosenSongs.push(
-                            nextPath.replace(songsPath + path.sep, '')
-                        );
                     }
                 }
             } else {
@@ -73,11 +79,12 @@ async function getSongs(args: PlayMusicArgs) {
         // only give a limit if there is no need for sorting
         !args.new && !args['delete-old-first'] && !args['play-new-first']
             ? args.limit
-            : undefined
+            : undefined,
+        args.skip
     );
 
     if (songs.length === 0) {
-        return [];
+        return songs;
     }
 
     if (args.new || args['delete-old-first']) {
