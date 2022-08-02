@@ -6,248 +6,20 @@ import path from 'path';
 import yargs from 'yargs';
 
 import { config } from './config.js';
-import { doesSongPass } from './does-song-pass.js';
 import * as playMusic from './play-music.js';
-import { editSongInstallName, editSongList } from './pipe-through-editor.js';
+import { editSongInstallName } from './pipe-through-editor.js';
+import { getSongs } from './get-songs.js';
+import { liveQueryResults } from './live-query-results.js';
 
 import type { PlayMusicArgs } from './play-music.js';
-
-let songsPath = config.get('path') as string;
-let vlcPath = config.get('pathToVLC') as string;
-let persist = config.get('persist') as boolean;
-let sortType = config.get('sortType') as 'atimeMs' | 'ctimeMs' | 'mtimeMs';
 
 const promiseBasedExec = promisify(realExec);
 let exec = promiseBasedExec;
 let timeoutTillExit = 100;
 
-function getSongsByTerms(terms: string[], limit?: number, skip?: number) {
-    const chosenSongs: string[] = [];
-    let skipped = 0;
-
-    function walk(dir: string) {
-        const files = readdirSync(dir);
-
-        for (const file of files) {
-            const nextPath = path.join(dir, file);
-            const stats = statSync(nextPath);
-
-            if (!stats.isDirectory()) {
-                if (
-                    doesSongPass(
-                        terms,
-                        nextPath
-                            .toLowerCase()
-                            .replace(songsPath.toLowerCase(), '')
-                    )
-                ) {
-                    if (skip && skipped < skip) {
-                        skipped++;
-                        continue;
-                    }
-
-                    chosenSongs.push(
-                        nextPath.replace(songsPath + path.sep, '')
-                    );
-
-                    // all the walk process-es that started will still run, idk
-                    // how to early exit out of function from inner function
-                    if (limit && chosenSongs.length === limit) {
-                        return;
-                    }
-                }
-            } else {
-                walk(nextPath);
-            }
-        }
-    }
-
-    walk(songsPath);
-    return chosenSongs;
-}
-
-function sortByNew(a: string, b: string) {
-    const songAStats = statSync(path.join(songsPath, a));
-    const songBStats = statSync(path.join(songsPath, b));
-
-    return songBStats[sortType] - songAStats[sortType];
-}
-
-async function getSongs(args: PlayMusicArgs) {
-    let songs = getSongsByTerms(
-        args.terms || [],
-        // only give a limit if there is no need for sorting
-        !args.new && !args['delete-old-first'] && !args['play-new-first']
-            ? args.limit
-            : undefined,
-        args.skip
-    );
-
-    if (songs.length === 0) {
-        return songs;
-    }
-
-    if (args.new || args['delete-old-first']) {
-        songs.sort(sortByNew);
-    }
-
-    if (args.limit && songs.length > args.limit) {
-        songs.length = args.limit;
-    }
-
-    // !args.new && !args['delete-old-first'] to make sure we don't uselessly sort again
-    if (args['play-new-first'] && !args.new && !args['delete-old-first']) {
-        songs.sort(sortByNew);
-    }
-
-    if (args.editor) {
-        return await editSongList(songs);
-    }
-
-    return songs;
-}
-
-function writeToScreen(query: string, msg: string) {
-    process.stdout.write('\r');
-    process.stdout.clearScreenDown();
-
-    const queryMessage = 'Search: ' + query;
-
-    process.stdout.write(
-        queryMessage + '\n-----------------------\n' + msg + '\n'
-    );
-
-    process.stdout.moveCursor(
-        queryMessage.length,
-        -(msg.split('\n').length + 2)
-    );
-}
-
-async function liveQueryResults() {
-    const { stdin } = process;
-    const wordsRegex = /[\s+#,]/g;
-
-    stdin.setRawMode(true);
-    stdin.resume();
-    stdin.setEncoding('utf8');
-
-    let query = '';
-    let lastSongs: string[] = [];
-    // @ts-expect-error
-    let lastArgsFromQuery: PlayMusicArgs = {};
-
-    writeToScreen('', '');
-
-    const parser = yargs()
-        // idk the typing is off for yargs
-        // @ts-expect-error
-        .command({
-            command: '$0 [terms..]',
-            describe: '',
-            builder: playMusic.builder,
-            handler: () => {},
-        })
-        .help(false)
-        .strict(true);
-
-    stdin.on('data', async function (key: string) {
-        let prevQuery = query;
-
-        switch (key) {
-            // ctrl-c
-            case '\u0003':
-                process.stdout.write('\r');
-                process.stdout.clearScreenDown();
-
-                process.exit();
-            // backspace
-            case '\x7F':
-                query = query.slice(0, query.length - 1);
-                break;
-            // ctrl-u
-            case '\x15':
-                query = '';
-                break;
-            // ctrl-w
-            case '\x17':
-                let words = query.trimEnd().split(wordsRegex);
-                const seperators = query.match(wordsRegex);
-
-                words = words.slice(0, words.length - 1);
-                query = '';
-
-                for (let i = 0; i < words.length; i++) {
-                    query += words[i];
-
-                    if (i != words.length - 1 && seperators && seperators[i]) {
-                        query += seperators[i];
-                    }
-                }
-                break;
-            case '\r':
-                process.stdout.write('\r');
-                process.stdout.clearScreenDown();
-
-                if (lastSongs.length === 0) {
-                    console.log('No songs selected.');
-                    process.exit(0);
-                }
-
-                playMusic.run({
-                    args: lastArgsFromQuery,
-                    exec,
-                    songs: lastSongs,
-                    songsPath,
-                    vlcPath,
-                });
-
-                playMusic.message(lastSongs);
-
-                await new Promise((res) =>
-                    setTimeout(() => process.exit(), timeoutTillExit)
-                );
-                break;
-        }
-
-        const asciiCode = key.charCodeAt(0);
-
-        if (asciiCode < 32 || asciiCode > 126) {
-            if (query === prevQuery) {
-                return;
-            }
-        } else {
-            query += key;
-        }
-
-        let hasError = false;
-
-        const argsFromQuery = parser
-            .fail((msg: string) => {
-                hasError = true;
-                writeToScreen(query, msg);
-                lastSongs = [];
-            })
-            .parse(query) as PlayMusicArgs;
-
-        if (hasError) {
-            return;
-        }
-
-        const songs = await getSongs(argsFromQuery);
-        const msg = songs.slice(0, 20).join('\n');
-
-        writeToScreen(query, msg);
-
-        lastSongs = songs;
-        lastArgsFromQuery = argsFromQuery;
-    });
-
-    return new Promise<void>((res) => {
-        stdin.on('end', () => res());
-    });
-}
-
 async function playMusicHandler(args: PlayMusicArgs) {
+    const { 'vlc-path': vlcPath, 'songs-path': songsPath, persist } = args;
+
     if (
         args.terms.length === 0 &&
         !args.limit &&
@@ -267,11 +39,11 @@ async function playMusicHandler(args: PlayMusicArgs) {
     }
 
     if (args.live) {
-        await liveQueryResults();
+        await liveQueryResults(args, timeoutTillExit, exec);
         process.exit();
     }
 
-    const songs = await getSongs(args);
+    const songs = await getSongs(args, songsPath);
 
     if (songs.length === 0) {
         return console.error("Didn't match anything");
@@ -352,6 +124,7 @@ yargs(process.argv.slice(2))
             name?: string;
             editor?: boolean;
         }) => {
+            const songsPath = config.get('path') as string;
             const possibleFolders = readdirSync(songsPath);
             const adjustedFolder = folder.toLowerCase().replace(/\s+/g, '-');
             let selectedFolder = '';
@@ -401,7 +174,7 @@ yargs(process.argv.slice(2))
         },
     })
     .alias('h', 'help')
-    // @ts-expect-error
+    // @ts-ignore
     .middleware((args: PlayMusicArgs) => {
         if (args['dry-run']) {
             // @ts-expect-error
@@ -419,21 +192,31 @@ yargs(process.argv.slice(2))
             timeoutTillExit = 0;
         }
 
-        if (typeof args.persist !== 'undefined') {
-            persist = args.persist;
+        type SortTypeAlias = 'a' | 'c' | 'm';
+
+        const valuesFromConfig = {
+            persist: config.get('persist') as boolean,
+            vlcPath: config.get('pathToVLC') as string,
+            sortType: config.get('sortType') as `${SortTypeAlias}timeMs`,
+            songsPath: config.get('path') as string,
+        };
+
+        if (!args['songs-path']) {
+            args['songs-path'] = valuesFromConfig.songsPath;
         }
 
-        if (args['vlc-path']) {
-            vlcPath = args['vlc-path'];
+        if (!args['vlc-path']) {
+            args['vlc-path'] = valuesFromConfig.vlcPath;
         }
 
-        if (args['songs-path']) {
-            songsPath = path.resolve(args['songs-path']);
+        if (!('persist' in args)) {
+            args.persist = valuesFromConfig.persist;
         }
 
-        if (args['sort-type']) {
-            // @ts-expect-error
-            sortType = args['sort-type'] + 'timeMs';
+        if (!args['sort-type']) {
+            args['sort-type'] = valuesFromConfig.sortType.slice(
+                0
+            ) as SortTypeAlias;
         }
     })
     .strict().argv;

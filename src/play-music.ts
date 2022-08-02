@@ -4,16 +4,16 @@ import chalk from 'chalk';
 
 export interface PlayMusicArgs {
     terms: string[];
-    limit: number;
-    skip: number;
-    new: boolean;
-    persist?: boolean;
+    limit?: number;
+    skip?: number;
+    new?: boolean;
+    persist: boolean;
     live?: boolean;
     editor?: boolean;
-    'dry-run': boolean;
-    'dry-paths': boolean;
-    'play-new-first': boolean;
-    'delete-old-first': boolean;
+    'dry-run'?: boolean;
+    'dry-paths'?: boolean;
+    'play-new-first'?: boolean;
+    'delete-old-first'?: boolean;
     'vlc-path': string;
     'songs-path': string;
     'sort-type': 'a' | 'c' | 'm';
