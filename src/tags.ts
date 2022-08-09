@@ -29,7 +29,11 @@ export function addTags(tagName: string, songs: string[]) {
             songs,
         });
     } else {
-        tag.songs.push(...songs);
+        for (const song of songs) {
+            if (!tag.songs.includes(song)) {
+                tag.songs.push(song);
+            }
+        }
     }
 
     writeFileSync(filePath, JSON.stringify(tags), {});
