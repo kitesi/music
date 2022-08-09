@@ -12,7 +12,7 @@ import { getSongs } from './get-songs.js';
 import { liveQueryResults } from './live-query-results.js';
 
 import type { PlayMusicArgs } from './play-music.js';
-import { addTags } from './tags.js';
+import { changeSongsInTag } from './tags.js';
 
 const promiseBasedExec = promisify(realExec);
 let exec = promiseBasedExec;
@@ -58,9 +58,18 @@ async function playMusicHandler(args: PlayMusicArgs) {
     }
 
     if (args['add-to-tag']) {
-        addTags(
+        changeSongsInTag(
             args['add-to-tag'],
-            songs.map((s) => s.toLowerCase())
+            songs.map((s) => s.toLowerCase()),
+            true
+        );
+    }
+
+    if (args['set-to-tag']) {
+        changeSongsInTag(
+            args['set-to-tag'],
+            songs.map((s) => s.toLowerCase()),
+            false
         );
     }
 

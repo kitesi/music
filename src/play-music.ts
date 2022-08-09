@@ -12,6 +12,7 @@ export interface PlayMusicArgs {
     editor?: boolean;
     tags?: string[];
     'add-to-tag'?: string;
+    'set-to-tag'?: string;
     'dry-run'?: boolean;
     'dry-paths'?: boolean;
     'play-new-first'?: boolean;
@@ -65,6 +66,9 @@ export function builder(y: Argv) {
         .option('add-to-tag', {
             type: 'string',
             alias: 'a',
+        })
+        .option('set-to-tag', {
+            type: 'string',
         })
         .option('vlc-path', {
             type: 'string',

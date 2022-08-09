@@ -19,7 +19,11 @@ export function getTags() {
     return JSON.parse(readFileSync(filePath, 'utf-8') || '[]') as Tag[];
 }
 
-export function addTags(tagName: string, songs: string[]) {
+export function changeSongsInTag(
+    tagName: string,
+    songs: string[],
+    append: boolean
+) {
     const tags = getTags();
     let tag = tags.find((t) => t.name === tagName);
 
@@ -28,6 +32,8 @@ export function addTags(tagName: string, songs: string[]) {
             name: tagName,
             songs,
         });
+    } else if (!append) {
+        tag.songs = songs;
     } else {
         for (const song of songs) {
             if (!tag.songs.includes(song)) {
