@@ -28,7 +28,8 @@ async function playMusicHandler(args: PlayMusicArgs) {
         !args['play-new-first'] &&
         !args.new &&
         !args.live &&
-        !args.editor
+        !args.editor &&
+        (!args.tags || args.tags.length === 0)
     ) {
         exec(`${vlcPath} --recursive=expand "${songsPath}"`);
 
@@ -63,7 +64,12 @@ async function playMusicHandler(args: PlayMusicArgs) {
         );
     }
 
-    if (!args.limit && args.terms.length === 0 && !args.editor) {
+    if (
+        !args.limit &&
+        args.terms.length === 0 &&
+        !args.editor &&
+        (!args.tags || args.tags.length === 0)
+    ) {
         console.log('Playing all songs');
     } else {
         playMusic.message(songs);

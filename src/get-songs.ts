@@ -26,7 +26,7 @@ function doesSongPass(
     tags: string[] = [],
     songPath: string
 ): boolean {
-    if (terms.length === 0) {
+    if (terms.length === 0 && tags.length === 0) {
         return true;
     }
 
@@ -53,7 +53,7 @@ function doesSongPass(
                 validateQuery(tag, (w) =>
                     savedTags.some((t) => {
                         return (
-                            t.name === tag &&
+                            t.name.includes(tag) &&
                             t.songs.includes(songPath.slice(1))
                         );
                     })
@@ -70,8 +70,10 @@ function doesSongPass(
         }
     }
 
-    if (terms.every((t) => t.startsWith('!'))) {
-        return true;
+    // this is to help in the cases where terms.length = 0 or when the terms are all exclusions
+    // if they are all exclusions, they have passed every exclusion and as such, pass
+    if (!passedOneTerm && terms.every((t) => t.startsWith('!'))) {
+        passedOneTerm = true;
     }
 
     return passedOneTerm && passedTagRequirement;
