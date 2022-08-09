@@ -1,3 +1,18 @@
+# 1.10.0 (8/02/22)
+
+<!-- prettier-ignore -->
+- add `--skip <number>` => skip songs from the start, mainly implemented it for using it with `-n` or another
+- add tagging system
+
+`--tags | -t <string..>` => this will be an array of tag queries, sorta like the positional terms,
+to stop the array use `--` for example `-t sad \!mid 2019 -- -l5`
+
+Worth noting, tags are case-insensitive.
+
+`--add-to-tag | -a <string>` => add all the valid songs to the specified tag. `-d` will not stop this.
+
+`--set-to-tag` => set all the valid songs to the specified tag. If any songs exist in that tag, they will be removed `-d` will not stop this.
+
 # 1.9.0 (7/11/22)
 
 <!-- prettier-ignore -->

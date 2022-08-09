@@ -24,12 +24,13 @@ Simple music command line tool mainly for quick and robust querying. Works with 
 <!-- prettier-ignore -->
 - Lot of filtering options
   - Dry run to test what matches
+- Tags
 - Install music with youtube-dl
 
 ## Requirements
 
 <!-- prettier-ignore -->
-- NodeJS (reimplementation in rust in future)
+- NodeJS
 - VLC
 - youtube-dl (if you plan on installing music with this cli)
 
@@ -54,6 +55,17 @@ The directory:
 
 And then in that directory, you need to make a config.json
 
+Here's the schema:
+
+```json
+{
+    "path": "~/My-Music", // string to your music path. default is your HomeDir/Music
+    "pathToVLC": "~/Downloads/vlc", // path to vlc executablek. default is global vlc,
+    "sortType": "aTimeMs", // aTimeMs | mTimeMs | cTimeMs, default is modified
+    "persist": false // default = false
+}
+```
+
 ### Folder Structure
 
 Any file in your music folder will be considered when querying.
@@ -71,7 +83,7 @@ Any file in your music folder will be considered when querying.
 
 When filtering, the string that's tested is the full path to the file minus your music path.
 
-For example, `~/Music/Mac Miller/Objects In The Mirror.m4a` would use `Mac Miller/Objects In The Mirror.m4a`.
+For example, `~/Music/Jaxsoe/Make Time For Me.m4a` would use `Jaxson/Make Time For Me.m4a`.
 
 Filtering:
 
@@ -107,11 +119,11 @@ but does not have the word `bad`.
 
 Flairs:
 
-`--dry-run | -d` => dry run, show the results, don't actually open vlc
+`--dry-run | -d` => dry run, show the results, don't actually play any music
 
 `--dry-paths | -p` => only output all the matching songs, absolute path. This might help with some scripts.
 
-`--limit {num} | -l` => limit the amount of songs played
+`--limit {number} | -l` => limit the amount of songs played
 
 `--play-new-first | --pnf` => play by newest
 
@@ -119,7 +131,7 @@ Flairs:
 
 `--new | -n` => `--delete-old-first` and `--play-new-first`
 
-`--persist` => persist the instance of vlc
+`--persist` => persist the instance of vlc through the cli
 
 `--live` => this allows you to type out your query and get live feedback
 for the songs it will play
@@ -135,6 +147,21 @@ file content and play the songs based of it
 `--songs-path <string>` => specifies the songs path to use
 
 `--sort-type | -s <a|m|c>` => specifies the what timestamp to use (access, modified, changed)
+
+`--skip <number>` => skip songs from the start, mainly implemented it for using it with `-n` or another
+sorting option. If you use it with `-l`, the limit will still be the limit. It won't be limit - skip
+
+For example `. -l5 --skip 2` will still result in 5 songs being the max amount.
+
+`--tags | -t <string..>` => this will be an array of tag queries, sorta like the positional terms,
+to stop the array use `--` for example `-t sad \!mid 2019 -- -l5`
+
+Worth noting, tags are case-insensitive.
+
+`--add-to-tag | -a <string>` => add all the valid songs to the specified tag. `-d` will not stop this.
+Tags will be stored in `YOUR_MUSIC_PATH/tags.json`
+
+`--set-to-tag` => set all the valid songs to the specified tag. If any songs exist in that tag, they will be removed `-d` will not stop this.
 
 ### Installing music
 
@@ -158,42 +185,60 @@ Flairs:
 If you are using bash you can add the following in your `.bashrc`. I think it's pretty
 thorough but if you think there should be more you can create an issue.
 
-Note: I use `mx` as an alias for `music play`
+Note: I have `mx` as an alias for `music play`
+Note: You need `jq` if you want completions on `--add-to-tag|-a` or `--set-to-tag`
 
 ```bash
-MUSIC_PLAY_OPTIONS="--help --version --live --editor --dry-paths --play-new-first --delete-old-first --persist --vlc-path --sort-type --songs-path --dry-run --limit --new --pnf --dof --no-persist -h -n -d -l -p -s"
+MUSIC_PLAY_OPTIONS="--help --version --live --editor --skip --tags --add-to-tag --set-to-tag --dry-paths --play-new-first --delete-old-first --persist --vlc-path --sort-type --songs-path --dry-run --limit --new --pnf --dof --no-persist"
 
 _music_completions()
 {
     local cur_word="${COMP_WORDS[COMP_CWORD]}"
     local prev_word="${COMP_WORDS[COMP_CWORD - 1]}"
 
-    local install_command=false
+    local is_install_command=false
+    local is_play_command=false
 
+    # not the best checking ngl, esp with the aliases "i" and "p", might remove those
     for i in "${COMP_WORDS[@]}"
     do
         if [ "$i" = "install" ] || [ "$i" = "i" ] && [ "${COMP_WORDS[COMP_CWORD]}" != "i" ]; then
-            install_command=true
+            is_install_command=true
+            break
+        fi
+
+        if [ "$i" = "play" ] || [ "$i" = "p" ] && [ "${COMP_WORDS[COMP_CWORD]}" != "p" ]; then
+            is_play_command=true
             break
         fi
     done
 
-    if [ "$prev_word" = "install" ] || [ "$prev_word" = "i" ]; then
-        COMPREPLY=( $(compgen -W "https://www.youtube.com/watch?v=" -- ${cur_word}) )
-    elif [ "$prev_word" = "--format" ] || [ "$prev_word" = "-f" ]; then
-        COMPREPLY=( $(compgen -W "3gp aac flv m4a mp3 mp4 ogg wav webm" -- ${cur_word}) )
-    elif [ "$install_command" = true ]; then
+    local last_word_is_install=false
+
+    if [ "$is_play_command" = true ]; then
+        _music_play_completions
+        return 0
+    fi
+
+    case "$prev_word" in
+        install|i)
+            COMPREPLY=( $(compgen -W "https://www.youtube.com/watch?v=" -- ${cur_word}) )
+            last_word_is_install=1
+            ;;
+        --format|-f)
+            COMPREPLY=( $(compgen -W "3gp aac flv m4a mp3 mp4 ogg wav webm" -- ${cur_word}) )
+            ;;
+        *)
+            local generic_options="install play get-config-path ${MUSIC_PLAY_OPTIONS}"
+            COMPREPLY=( $(compgen -W "${generic_options}" -- ${cur_word}) )
+            ;;
+    esac
+
+    if [ "$is_install_command" = true ] && [ "$last_word_is_install" = false ] ; then
         # depending how up to date you want this to be, you can set this variable outside of
         # this function (global scope). It's still pretty fast for me so I personally won't
         local SONGS_SUB_DIRS=$(basename -a ~/Music/*/ | sed 's/ /-/g' | awk '{print tolower($0)}' | tr '\n' ' ')
-        COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}--format --ytdl-args --name --editor -e -f -y -n" -- ${cur_word}) )
-    elif [ "$prev_word" = "--sort-type" ]; then
-        COMPREPLY=( $(compgen -W "a c m" -- ${cur_word}) )
-    elif [ "$prev_word" = "--songs-path" ] || [ "$prev_word" = "--vlc-path" ]; then
-        COMPREPLY=()
-    else
-        local generic_options="install play get-config-path ${MUSIC_PLAY_OPTIONS}"
-        COMPREPLY=( $(compgen -W "${generic_options}" -- ${cur_word}) )
+        COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}--format --ytdl-args --name --editor" -- ${cur_word}) )
     fi
 
     return 0
@@ -201,8 +246,28 @@ _music_completions()
 
 _music_play_completions() {
     local cur_word="${COMP_WORDS[COMP_CWORD]}"
+    local prev_word="${COMP_WORDS[COMP_CWORD - 1]}"
 
-    COMPREPLY=( $(compgen -W "${MUSIC_PLAY_OPTIONS}" -- ${cur_word}) )
+    case "$prev_word" in
+        --sort-type|-s)
+            COMPREPLY=( $(compgen -W "a c m" -- ${cur_word}) )
+            ;;
+        --songs-path)
+            COMPREPLY=()
+            ;;
+        --add-to-tag|--set-to-tag|-a)
+            if [ -x "$(which jq)" ]; then
+                local tags=$(jq '.[].name' <~/Music/tags.json)
+                COMPREPLY=( $(compgen -W "$tags" -- ${cur_word}) )
+            else
+                COMPREPLY=( $(compgen -W "${MUSIC_PLAY_OPTIONS}" -- ${cur_word}) )
+            fi
+            ;;
+        *)
+            COMPREPLY=( $(compgen -W "${MUSIC_PLAY_OPTIONS}" -- ${cur_word}) )
+            ;;
+    esac
+
     return 0
 }
 
@@ -237,14 +302,7 @@ Now you can run mx like so: `mx jacob`
 ## Plans
 
 <!-- prettier-ignore -->
-- Tests
-- Config
-  - Colors
-  - Symbols (`!`, `#`, `,`)
-- Better documentation
 - Flairs
   - `--old | -o` sort by old
   - `--delete-new-first | --dnf` prioritize old songs
 - Playlists?
-- Tags?
-  - Maybe using file metadata, having to add it manually would be a pain
