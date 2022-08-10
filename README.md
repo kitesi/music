@@ -57,7 +57,7 @@ And then in that directory, you need to make a config.json
 
 Here's the schema:
 
-```json
+```jsonc
 {
     "path": "~/My-Music", // string to your music path. default is your HomeDir/Music
     "pathToVLC": "~/Downloads/vlc", // path to vlc executablek. default is global vlc,

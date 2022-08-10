@@ -41,7 +41,6 @@ export async function liveQueryResults(
 
     const parser = yargs()
         // idk the typing is off for yargs
-        // @ts-expect-error
         .command({
             command: '$0 [terms..]',
             describe: '',

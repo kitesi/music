@@ -27,8 +27,8 @@
         "chalk": "^4.1.1",
         "conf": "^10.0.3",
         "env-paths": "^3.0.0",
-        "yargs": "^17.0.1",
-        "open-graph-scraper": "^4.11.1"
+        "open-graph-scraper": "^4.11.1",
+        "yargs": "^17.5.1"
     },
     "repository": {
         "type": "git",
