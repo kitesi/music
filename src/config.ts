@@ -27,8 +27,8 @@ try {
             },
             sortType: {
                 type: 'string',
-                enum: ['atimeMs', 'ctimeMs', 'mtimeMs'],
-                default: 'mtimeMs',
+                enum: ['a', 'c', 'm'],
+                default: 'm',
             },
             persist: {
                 type: 'boolean',

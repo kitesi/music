@@ -214,32 +214,5 @@ yargs(process.argv.slice(2))
 
             timeoutTillExit = 0;
         }
-
-        type SortTypeAlias = 'a' | 'c' | 'm';
-
-        const valuesFromConfig = {
-            persist: config.get('persist') as boolean,
-            vlcPath: config.get('pathToVLC') as string,
-            sortType: config.get('sortType') as `${SortTypeAlias}timeMs`,
-            songsPath: config.get('path') as string,
-        };
-
-        if (!args['songs-path']) {
-            args['songs-path'] = valuesFromConfig.songsPath;
-        }
-
-        if (!args['vlc-path']) {
-            args['vlc-path'] = valuesFromConfig.vlcPath;
-        }
-
-        if (!('persist' in args)) {
-            args.persist = valuesFromConfig.persist;
-        }
-
-        if (!args['sort-type']) {
-            args['sort-type'] = valuesFromConfig.sortType.slice(
-                0
-            ) as SortTypeAlias;
-        }
     })
     .strict().argv;

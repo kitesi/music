@@ -1,6 +1,7 @@
-import type { Argv } from 'yargs';
-
 import chalk from 'chalk';
+import { config } from './config.js';
+
+import type { Argv } from 'yargs';
 
 export interface PlayMusicArgs {
     terms: string[];
@@ -53,6 +54,7 @@ export function builder(y: Argv) {
         })
         .option('persist', {
             type: 'boolean',
+            default: config.get('persist'),
         })
         .option('live', {
             type: 'boolean',
@@ -72,6 +74,7 @@ export function builder(y: Argv) {
         })
         .option('vlc-path', {
             type: 'string',
+            default: config.get('pathToVLC'),
         })
 
         .option('tags', {
@@ -83,9 +86,11 @@ export function builder(y: Argv) {
             type: 'string',
             choices: ['a', 'm', 'c'],
             alias: 's',
+            default: config.get('sortType'),
         })
         .option('songs-path', {
             type: 'string',
+            default: config.get('path'),
         })
         .positional('terms', {
             type: 'string',
