@@ -1,10 +1,11 @@
 import yargs from 'yargs';
 import * as playMusic from './play-music.js';
 import { getSongs } from './get-songs.js';
+import fs from 'fs';
 
 import type { PlayMusicArgs } from './play-music.js';
 
-function writeToScreen(query: string, msg: string) {
+function writeToScreen(query: string, msg: string, songs?: string[]) {
     process.stdout.write('\r');
     process.stdout.clearScreenDown();
 
@@ -14,10 +15,13 @@ function writeToScreen(query: string, msg: string) {
         queryMessage + '\n-----------------------\n' + msg + '\n'
     );
 
-    process.stdout.moveCursor(
-        queryMessage.length,
-        -(msg.split('\n').length + 2)
-    );
+    let lines = msg.split('\n').length;
+
+    if (songs) {
+        lines += songs.filter((s) => s.length > process.stdout.columns).length;
+    }
+
+    process.stdout.moveCursor(queryMessage.length, -(lines + 2));
 }
 
 export async function liveQueryResults(
@@ -32,13 +36,6 @@ export async function liveQueryResults(
     stdin.resume();
     stdin.setEncoding('utf8');
 
-    let query = '';
-    let lastSongs: string[] = [];
-    // @ts-expect-error
-    let lastArgsFromQuery: PlayMusicArgs = {};
-
-    writeToScreen('', '');
-
     const parser = yargs()
         // idk the typing is off for yargs
         .command({
@@ -49,6 +46,12 @@ export async function liveQueryResults(
         })
         .help(false)
         .strict(true);
+
+    let query = '';
+    let lastSongs: string[] = [];
+    let lastArgsFromQuery: ReturnType<ReturnType<typeof parser>['parseSync']>;
+
+    writeToScreen('', '');
 
     stdin.on('data', async function (key: string) {
         let prevQuery = query;
@@ -94,6 +97,7 @@ export async function liveQueryResults(
                 }
 
                 playMusic.run({
+                    // @ts-ignore
                     args: lastArgsFromQuery,
                     exec,
                     songs: lastSongs,
@@ -127,16 +131,20 @@ export async function liveQueryResults(
                 writeToScreen(query, msg);
                 lastSongs = [];
             })
-            .parse(query) as PlayMusicArgs;
+            .parseSync(query);
 
         if (hasError) {
             return;
         }
 
-        const songs = await getSongs(argsFromQuery, songsPath);
-        const msg = songs.slice(0, 20).join('\n');
+        argsFromQuery['songs-path'] = songsPath;
 
-        writeToScreen(query, msg);
+        // @ts-ignore
+        const songs = await getSongs(argsFromQuery, songsPath);
+        const showenSongs = songs.slice(0, 20);
+        const msg = showenSongs.join('\n');
+
+        writeToScreen(query, msg, showenSongs);
 
         lastSongs = songs;
         lastArgsFromQuery = argsFromQuery;

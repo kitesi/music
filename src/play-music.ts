@@ -90,6 +90,7 @@ export function builder(y: Argv) {
         .positional('terms', {
             type: 'string',
             array: true,
+            default: [],
         });
 }
 
