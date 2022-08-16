@@ -1,6 +1,6 @@
 {
     "name": "@karizma/music",
-    "version": "1.10.0",
+    "version": "1.11.0",
     "description": "Simple music cli that works with local files. Does not include a tui, or interactive mode.",
     "bin": {
         "music": "dist/main.js"
@@ -32,12 +32,12 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/karizma/music-cli.git"
+        "url": "git+https://github.com/sixskys/music-cli.git"
     },
     "bugs": {
-        "url": "https://github.com/karizma/music-cli/issues"
+        "url": "https://github.com/sixskys/music-cli/issues"
     },
-    "homepage": "https://github.com/karizma/music-cli#readme",
+    "homepage": "https://github.com/sixskys/music-cli#readme",
     "devDependencies": {
         "@types/open-graph-scraper": "^4.8.1"
     }

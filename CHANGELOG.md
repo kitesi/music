@@ -1,4 +1,13 @@
-# 1.10.0 (8/02/22)
+# 1.11.0 (8/16/22)
+
+<!-- prettier-ignore -->
+- fix live-search-query
+  - no query worked as terms was not set by default
+  - if a song's name length was greater than the terminal width, it would mess up the cursor position
+  - fix -n not working
+- internal: remove setting config values in middleware, and use the default option in the builder (play-music.ts)
+
+# 1.10.0 (8/09/22)
 
 <!-- prettier-ignore -->
 - add `--skip <number>` => skip songs from the start, mainly implemented it for using it with `-n` or another
