@@ -19,13 +19,13 @@ let exec = promiseBasedExec;
 let timeoutTillExit = 100;
 
 async function playMusicHandler(args: PlayMusicArgs) {
-    const { 'vlc-path': vlcPath, 'songs-path': songsPath, persist } = args;
+    const { vlcPath, songsPath, persist } = args;
 
     if (
         args.terms.length === 0 &&
         !args.limit &&
-        !args['dry-paths'] &&
-        !args['play-new-first'] &&
+        !args.dryPaths &&
+        !args.playNewFirst &&
         !args.new &&
         !args.live &&
         !args.editor &&
@@ -51,23 +51,23 @@ async function playMusicHandler(args: PlayMusicArgs) {
         return console.error("Didn't match anything");
     }
 
-    if (args['dry-paths']) {
+    if (args.dryPaths) {
         return console.log(
             songs.map((s) => path.join(songsPath, s)).join('\n')
         );
     }
 
-    if (args['add-to-tag']) {
+    if (args.addToTag) {
         changeSongsInTag(
-            args['add-to-tag'],
+            args.addToTag,
             songs.map((s) => s.toLowerCase()),
             true
         );
     }
 
-    if (args['set-to-tag']) {
+    if (args.setToTag) {
         changeSongsInTag(
-            args['set-to-tag'],
+            args.setToTag,
             songs.map((s) => s.toLowerCase()),
             false
         );
@@ -199,7 +199,7 @@ yargs(process.argv.slice(2))
     .alias('h', 'help')
     // @ts-ignore
     .middleware((args: PlayMusicArgs) => {
-        if (args['dry-run']) {
+        if (args.dryRun) {
             // @ts-expect-error
             exec = () => {
                 const promise = Object.assign(new Promise((res) => res), {

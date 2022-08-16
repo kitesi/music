@@ -25,7 +25,7 @@ function writeToScreen(query: string, msg: string, songs?: string[]) {
 }
 
 export async function liveQueryResults(
-    { 'songs-path': songsPath, 'vlc-path': vlcPath }: PlayMusicArgs,
+    { songsPath, vlcPath }: PlayMusicArgs,
     timeoutTillExit: number,
     exec: (q: string) => Promise<any>
 ) {

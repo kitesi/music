@@ -12,15 +12,15 @@ export interface PlayMusicArgs {
     live?: boolean;
     editor?: boolean;
     tags?: string[];
-    'add-to-tag'?: string;
-    'set-to-tag'?: string;
-    'dry-run'?: boolean;
-    'dry-paths'?: boolean;
-    'play-new-first'?: boolean;
-    'delete-old-first'?: boolean;
-    'vlc-path': string;
-    'songs-path': string;
-    'sort-type': 'a' | 'c' | 'm';
+    addToTag?: string;
+    setToTag?: string;
+    dryRun?: boolean;
+    dryPaths?: boolean;
+    playNewFirst?: boolean;
+    deleteOldFirst?: boolean;
+    vlcPath: string;
+    songsPath: string;
+    sortType: 'a' | 'c' | 'm';
 }
 
 export function builder(y: Argv) {
@@ -113,7 +113,7 @@ export function run({ exec, vlcPath, args, songs, songsPath }: RunArgs) {
             .map(
                 (s) =>
                     `"${songsPath}/${s}" ${
-                        args.new || args['play-new-first'] ? '--no-random' : ''
+                        args.new || args.playNewFirst ? '--no-random' : ''
                     }`
             )
             .join(' ')}`

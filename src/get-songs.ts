@@ -80,12 +80,12 @@ function doesSongPass(
 }
 
 function getSongsByTerms(args: PlayMusicArgs) {
-    let { 'songs-path': songsPath, terms, skip, limit } = args;
+    let { songsPath, terms, skip, limit } = args;
     const chosenSongs: string[] = [];
     let skipped = 0;
 
     // only give a limit if there is no need for sorting
-    if (args.new || args['delete-old-first'] || args['play-new-first']) {
+    if (args.new || args.deleteOldFirst || args.playNewFirst) {
         limit = undefined;
     }
 
@@ -132,8 +132,8 @@ function getSongsByTerms(args: PlayMusicArgs) {
 }
 
 export async function getSongs(args: PlayMusicArgs, songsPath: string) {
-    const sortType = (args['sort-type'] +
-        'timeMs') as `${typeof args['sort-type']}timeMs`;
+    const sortType = (args.sortType +
+        'timeMs') as `${typeof args.sortType}timeMs`;
 
     function sortByNew(a: string, b: string) {
         const songAStats = statSync(path.join(songsPath, a));
@@ -148,7 +148,7 @@ export async function getSongs(args: PlayMusicArgs, songsPath: string) {
         return songs;
     }
 
-    if (args.new || args['delete-old-first']) {
+    if (args.new || args.deleteOldFirst) {
         songs.sort(sortByNew);
     }
 
@@ -157,7 +157,7 @@ export async function getSongs(args: PlayMusicArgs, songsPath: string) {
     }
 
     // !args.new && !args['delete-old-first'] to make sure we don't uselessly sort again
-    if (args['play-new-first'] && !args.new && !args['delete-old-first']) {
+    if (args.playNewFirst && !args.new && !args.deleteOldFirst) {
         songs.sort(sortByNew);
     }
 
