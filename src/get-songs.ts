@@ -80,13 +80,16 @@ function doesSongPass(
 }
 
 function getSongsByTerms(args: PlayMusicArgs) {
-    let { songsPath, terms, skip, limit } = args;
+    let { songsPath, terms, limit, skip } = args;
     const chosenSongs: string[] = [];
-    let skipped = 0;
 
     // only give a limit if there is no need for sorting
     if (args.new || args.deleteOldFirst || args.playNewFirst) {
         limit = undefined;
+    }
+
+    if (limit && skip) {
+        limit += skip;
     }
 
     function walk(dir: string) {
@@ -106,11 +109,6 @@ function getSongsByTerms(args: PlayMusicArgs) {
                             .replace(songsPath.toLowerCase(), '')
                     )
                 ) {
-                    if (skip && skipped < skip) {
-                        skipped++;
-                        continue;
-                    }
-
                     chosenSongs.push(
                         nextPath.replace(songsPath + path.sep, '')
                     );
@@ -150,6 +148,10 @@ export async function getSongs(args: PlayMusicArgs, songsPath: string) {
 
     if (args.new || args.deleteOldFirst) {
         songs.sort(sortByNew);
+    }
+
+    if (args.skip) {
+        songs = songs.slice(args.skip);
     }
 
     if (args.limit && songs.length > args.limit) {
