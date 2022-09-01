@@ -1,3 +1,20 @@
+# 1.12.0 (8/31/22)
+
+<!-- prettier-ignore -->
+-   add `--append | --enqueue`, this will append songs to your playlist rather than just outright playing them and skipping the current one, default is true 
+-   add `--random | -z`, makes the playlist shuffle (through vlc, doesn't internally shuffle)
+-   fix `--skip` bug
+-   fix `--dry-paths` with `--set-to-tag` or `--add-to-tag`, `--dry-paths` was checked first
+and returned if true, so tags were not set/added, when they should be
+-   check for empty string on `--set-to-tag` and `--add-to-tag`
+-   remove config
+    -   remove `get-config-path` command
+    -   add `--songs-path` for install command
+
+Every option in the config can be done with --flairs. If you need
+default values I recommend setting up an alias with the flairs like so:
+`alias mus="music --songs-path '~/some/dir'"`
+
 # 1.11.0 (8/16/22)
 
 <!-- prettier-ignore -->
