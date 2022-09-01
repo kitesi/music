@@ -1,17 +1,16 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 
-import { config } from './config.js';
-
-const songsPath = config.get('path') as string;
-const filePath = path.join(songsPath, 'tags.json');
-
 interface Tag {
     name: string;
     songs: string[];
 }
 
-export function getTags() {
+const tagsFileName = 'tags.json';
+
+export function getTags(songsPath: string) {
+    const filePath = path.join(songsPath, tagsFileName);
+
     if (!existsSync(filePath)) {
         return [];
     }
@@ -20,11 +19,14 @@ export function getTags() {
 }
 
 export function changeSongsInTag(
+    songsPath: string,
     tagName: string,
     songs: string[],
     append: boolean
 ) {
-    const tags = getTags();
+    const tags = getTags(songsPath);
+    const filePath = path.join(songsPath, tagsFileName);
+
     let tag = tags.find((t) => t.name === tagName);
 
     if (!tag) {

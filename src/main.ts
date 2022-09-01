@@ -51,14 +51,9 @@ async function playMusicHandler(args: PlayMusicArgs) {
         return console.error("Didn't match anything");
     }
 
-    if (args.dryPaths) {
-        return console.log(
-            songs.map((s) => path.join(songsPath, s)).join('\n')
-        );
-    }
-
     if (args.addToTag) {
         changeSongsInTag(
+            songsPath,
             args.addToTag,
             songs.map((s) => s.toLowerCase()),
             true
@@ -67,9 +62,16 @@ async function playMusicHandler(args: PlayMusicArgs) {
 
     if (args.setToTag) {
         changeSongsInTag(
+            songsPath,
             args.setToTag,
             songs.map((s) => s.toLowerCase()),
             false
+        );
+    }
+
+    if (args.dryPaths) {
+        return console.log(
+            songs.map((s) => path.join(songsPath, s)).join('\n')
         );
     }
 

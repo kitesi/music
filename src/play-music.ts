@@ -41,7 +41,7 @@ export function builder(y: Argv) {
         })
         .option('append', {
             type: 'boolean',
-            alias: ['enqueue', 'a'],
+            alias: 'enqueue',
             default: true,
             describe: 'enqueue items to playlist rather than skipping to song',
         })
@@ -57,9 +57,27 @@ export function builder(y: Argv) {
         .option('add-to-tag', {
             type: 'string',
             alias: 'a',
+            coerce: (val) => {
+                if (val === '') {
+                    throw new Error(
+                        "Error: --add-to-tag didn't recieve any argument"
+                    );
+                }
+
+                return val;
+            },
         })
         .option('set-to-tag', {
             type: 'string',
+            coerce: (val) => {
+                if (val === '') {
+                    throw new Error(
+                        "Error: --set-to-tag didn't recieve any argument"
+                    );
+                }
+
+                return val;
+            },
         })
         .option('vlc-path', {
             type: 'string',

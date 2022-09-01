@@ -23,7 +23,8 @@ function validateQuery(query: string, validate: (word: string) => boolean) {
 
 function doesSongPass(
     terms: string[],
-    tags: string[] = [],
+    tags: string[],
+    savedTags: ReturnType<typeof getTags>,
     songPath: string
 ): boolean {
     if (terms.length === 0 && tags.length === 0) {
@@ -46,8 +47,6 @@ function doesSongPass(
     }
 
     if (tags.length > 0) {
-        const savedTags = getTags();
-
         for (let tag of tags) {
             if (
                 validateQuery(tag, (w) =>
@@ -81,6 +80,7 @@ function doesSongPass(
 
 function getSongsByTerms(args: PlayMusicArgs) {
     let { songsPath, terms, limit, skip } = args;
+    const savedTags = getTags(songsPath);
     const chosenSongs: string[] = [];
 
     // only give a limit if there is no need for sorting
@@ -103,7 +103,8 @@ function getSongsByTerms(args: PlayMusicArgs) {
                 if (
                     doesSongPass(
                         terms,
-                        args.tags,
+                        args.tags || [],
+                        savedTags,
                         nextPath
                             .toLowerCase()
                             .replace(songsPath.toLowerCase(), '')
