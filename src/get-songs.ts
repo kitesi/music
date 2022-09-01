@@ -2,9 +2,9 @@ import path from 'path';
 import { statSync, readdirSync } from 'fs';
 
 import { editSongList } from './pipe-through-editor.js';
+import { getTags } from './tags.js';
 
 import type { PlayMusicArgs } from './play-music.js';
-import { getTags } from './tags.js';
 
 function validateQuery(query: string, validate: (word: string) => boolean) {
     let term = query.toLowerCase();

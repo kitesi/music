@@ -5,7 +5,6 @@ import { promisify } from 'util';
 import path from 'path';
 import yargs from 'yargs';
 
-import { config } from './config.js';
 import * as playMusic from './play-music.js';
 import { editSongInstallName } from './pipe-through-editor.js';
 import { getSongs } from './get-songs.js';
@@ -13,6 +12,7 @@ import { liveQueryResults } from './live-query-results.js';
 
 import type { PlayMusicArgs } from './play-music.js';
 import { changeSongsInTag } from './tags.js';
+import { songsPath as defaultSongsPath } from './get-default-songs-path.js';
 
 const promiseBasedExec = promisify(realExec);
 let exec = promiseBasedExec;
@@ -100,13 +100,6 @@ yargs(process.argv.slice(2))
         handler: playMusicHandler,
     })
     .command({
-        command: 'get-config-path',
-        describe: 'get the config path',
-        handler: () => {
-            console.log(config.path);
-        },
-    })
-    .command({
         command: ['install <id> <folder>', 'i'],
         describe: 'install music from youtube id or url',
         builder: (y) => {
@@ -129,6 +122,10 @@ yargs(process.argv.slice(2))
                     type: 'boolean',
                     alias: 'e',
                 })
+                .option('songs-path', {
+                    type: 'string',
+                    default: defaultSongsPath,
+                })
                 .conflicts('editor', 'name');
         },
         // @ts-expect-error
@@ -139,6 +136,7 @@ yargs(process.argv.slice(2))
             'ytdl-args': ytdlArgs,
             name: fileName,
             editor,
+            songsPath,
         }: {
             folder: string;
             id: string;
@@ -146,8 +144,8 @@ yargs(process.argv.slice(2))
             'ytdl-args'?: string;
             name?: string;
             editor?: boolean;
+            songsPath: string;
         }) => {
-            const songsPath = config.get('path') as string;
             const possibleFolders = readdirSync(songsPath);
             const adjustedFolder = folder.toLowerCase().replace(/\s+/g, '-');
             let selectedFolder = '';

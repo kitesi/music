@@ -1,27 +1,11 @@
 import chalk from 'chalk';
-import { config } from './config.js';
+import { songsPath } from './get-default-songs-path.js';
 
 import type { Argv } from 'yargs';
 
-export interface PlayMusicArgs {
-    terms: string[];
-    limit?: number;
-    skip?: number;
-    new?: boolean;
-    persist: boolean;
-    live?: boolean;
-    editor?: boolean;
-    tags?: string[];
-    addToTag?: string;
-    setToTag?: string;
-    dryRun?: boolean;
-    dryPaths?: boolean;
-    playNewFirst?: boolean;
-    deleteOldFirst?: boolean;
-    vlcPath: string;
-    songsPath: string;
-    sortType: 'a' | 'c' | 'm';
-}
+export type PlayMusicArgs = ReturnType<ReturnType<typeof builder>['parseSync']>;
+
+const sortTypes = ['a', 'm', 'c'] as const;
 
 export function builder(y: Argv) {
     return y
@@ -54,7 +38,6 @@ export function builder(y: Argv) {
         })
         .option('persist', {
             type: 'boolean',
-            default: config.get('persist'),
         })
         .option('live', {
             type: 'boolean',
@@ -74,28 +57,26 @@ export function builder(y: Argv) {
         })
         .option('vlc-path', {
             type: 'string',
-            default: config.get('pathToVLC'),
+            default: 'vlc',
         })
-
         .option('tags', {
             type: 'array',
             alias: 't',
             string: true,
         })
         .option('sort-type', {
-            type: 'string',
-            choices: ['a', 'm', 'c'],
+            choices: sortTypes,
             alias: 's',
-            default: config.get('sortType'),
+            default: 'm' as typeof sortTypes[number],
         })
         .option('songs-path', {
             type: 'string',
-            default: config.get('path'),
+            default: songsPath,
         })
         .positional('terms', {
             type: 'string',
             array: true,
-            default: [],
+            default: [] as string[],
         });
 }
 
