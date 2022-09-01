@@ -39,6 +39,12 @@ export function builder(y: Argv) {
         .option('persist', {
             type: 'boolean',
         })
+        .option('append', {
+            type: 'boolean',
+            alias: ['enqueue', 'a'],
+            default: true,
+            describe: 'enqueue items to playlist rather than skipping to song',
+        })
         .option('live', {
             type: 'boolean',
             describe: 'get live query results with stdin input',
@@ -89,16 +95,15 @@ interface RunArgs {
 }
 
 export function run({ exec, vlcPath, args, songs, songsPath }: RunArgs) {
-    exec(
-        `${vlcPath} ${songs
-            .map(
-                (s) =>
-                    `"${songsPath}/${s}" ${
-                        args.new || args.playNewFirst ? '--no-random' : ''
-                    }`
-            )
-            .join(' ')}`
-    ).catch((reason: any) =>
+    const vlcArgs = songs.map((s) => `"${songsPath}/${s}"`);
+
+    if (args.new || args.playNewFirst) {
+        vlcArgs.push('--no-random');
+    }
+
+    vlcArgs.push(args.enqueue ? '--playlist-enqueue' : '--no-playlist-enqueue');
+
+    exec(vlcPath + ' ' + vlcArgs.join(' ')).catch((reason: any) =>
         console.error('Error: ' + (reason?.message || `\n\n${reason}`))
     );
 }
