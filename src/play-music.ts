@@ -24,6 +24,10 @@ export function builder(y: Argv) {
             alias: 'n',
             type: 'boolean',
         })
+        .option('random', {
+            alias: 'z',
+            type: 'boolean',
+        })
         .option('play-new-first', {
             type: 'boolean',
             alias: 'pnf',
@@ -112,11 +116,16 @@ interface RunArgs {
     vlcPath: string;
 }
 
-export function run({ exec, vlcPath, args, songs, songsPath }: RunArgs) {
+export function execVLC({ exec, vlcPath, args, songs, songsPath }: RunArgs) {
     const vlcArgs = songs.map((s) => `"${songsPath}/${s}"`);
 
+    // might be easier to just do vlcArgs.push(args.random ? "--random" : "--no-random")
+    // but I think there's a possiblity that the user's config kicks in if
+    // neither is provided
     if (args.new || args.playNewFirst) {
         vlcArgs.push('--no-random');
+    } else if (args.random) {
+        vlcArgs.push('--random');
     }
 
     vlcArgs.push(args.enqueue ? '--playlist-enqueue' : '--no-playlist-enqueue');

@@ -96,7 +96,7 @@ export async function liveQueryResults(
                     process.exit(0);
                 }
 
-                playMusic.run({
+                playMusic.execVLC({
                     // @ts-ignore
                     args: lastArgsFromQuery,
                     exec,

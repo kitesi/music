@@ -86,7 +86,7 @@ async function playMusicHandler(args: PlayMusicArgs) {
         playMusic.message(songs);
     }
 
-    playMusic.run({ args, exec, songs, songsPath, vlcPath });
+    playMusic.execVLC({ args, exec, songs, songsPath, vlcPath });
 
     if (!persist) {
         setTimeout(() => process.exit(0), timeoutTillExit);
