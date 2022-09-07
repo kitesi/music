@@ -1,7 +1,6 @@
 import yargs from 'yargs';
 import * as playMusic from './play-music.js';
 import { getSongs } from './get-songs.js';
-import fs from 'fs';
 
 import type { PlayMusicArgs } from './play-music.js';
 

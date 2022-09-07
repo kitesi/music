@@ -100,6 +100,7 @@ export function builder(y: Argv) {
         .option('songs-path', {
             type: 'string',
             default: songsPath,
+            coerce: (e) => (e.endsWith('/') ? e.substring(0, e.length - 1) : e),
         })
         .positional('terms', {
             type: 'string',

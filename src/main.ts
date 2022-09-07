@@ -215,4 +215,5 @@ yargs(process.argv.slice(2))
             timeoutTillExit = 0;
         }
     })
-    .strict().argv;
+    .strict()
+    .parserConfiguration({ 'duplicate-arguments-array': false }).argv;
