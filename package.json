@@ -22,7 +22,7 @@
     "license": "MIT",
     "type": "module",
     "dependencies": {
-        "@types/node": "^16.10.2",
+        "@types/node": "^16.11.60",
         "@types/yargs": "^17.0.0",
         "chalk": "^4.1.1",
         "open-graph-scraper": "^4.11.1",
