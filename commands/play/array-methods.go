@@ -27,3 +27,9 @@ func some[T any](arr []T, validator func(T) bool) bool {
 
 	return false
 }
+
+func includes[T comparable](arr []T, item T) bool {
+	return some(arr, func(i T) bool {
+		return i == item
+	})
+}

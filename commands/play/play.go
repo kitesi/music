@@ -1,7 +1,6 @@
 package play
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log"
@@ -12,11 +11,6 @@ import (
 
 	"github.com/spf13/cobra"
 )
-
-type Tag struct {
-	Name  string   `json:"name"`
-	Songs []string `json:"songs"`
-}
 
 type Song struct {
 	stat fs.FileInfo
@@ -88,14 +82,6 @@ func run(args PlayArgs, terms []string) {
 		return
 	}
 
-	if args.addToTag != "" {
-		return
-	}
-
-	if args.setToTag != "" {
-		return
-	}
-
 	if args.musicPath == "" {
 		dirname, err := os.UserHomeDir()
 
@@ -113,6 +99,14 @@ func run(args PlayArgs, terms []string) {
 	}
 
 	songs := getSongs(args, terms)
+
+	if args.addToTag != "" {
+		changeSongsInTag(args.musicPath, args.addToTag, songs, true)
+	}
+
+	if args.setToTag != "" {
+		changeSongsInTag(args.musicPath, args.setToTag, songs, false)
+	}
 
 	if args.dryPaths {
 		for _, s := range songs {
@@ -146,23 +140,7 @@ func getSongs(args PlayArgs, terms []string) []Song {
 	songs := []Song{}
 	canEndEarly := !args.new && !args.skipOldFirst && !args.playNewFirst
 
-	var savedTags []Tag
-	content, err := os.ReadFile(filepath.Join(args.musicPath, "tags.json"))
-
-	if err == os.ErrNotExist {
-		savedTags = []Tag{}
-	} else if err != nil {
-		log.Fatal("Error while opening tags file: ", err)
-	} else {
-		var payload []Tag
-		err = json.Unmarshal(content, &payload)
-
-		if err != nil {
-			log.Fatal("Error during Unmarshal() of tags.json: ", err)
-		}
-
-		savedTags = payload
-	}
+	storedTags := getStoredTags(args.musicPath)
 
 	if args.limit > 0 && args.skip > 0 {
 		args.limit += args.skip
@@ -177,7 +155,7 @@ func getSongs(args PlayArgs, terms []string) []Song {
 			return nil
 		}
 
-		if doesSongPass(args, savedTags, terms, strings.ToLower(fileName)) {
+		if doesSongPass(args, storedTags, terms, strings.ToLower(fileName)) {
 			stat, statErr := os.Stat(fileName)
 
 			if statErr != nil {
