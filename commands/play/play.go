@@ -9,11 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/djherbis/times"
 	"github.com/spf13/cobra"
 )
 
 type Song struct {
-	stat fs.FileInfo
+	stat times.Timespec
 	path string
 }
 
@@ -68,7 +69,7 @@ func Setup(rootCmd *cobra.Command) {
 
 	playCmd.Flags().StringArrayVarP(&args.tags, "tags", "t", []string{}, "required tags to match")
 
-	playCmd.Flags().StringVarP(&args.vlcPath, "sort-type", "s", "m", "timestamp to use when sorting by time (a|m|c)")
+	playCmd.Flags().StringVarP(&args.sortType, "sort-type", "s", "m", "timestamp to use when sorting by time (a|m|c)")
 
 	playCmd.Flags().IntVarP(&args.limit, "limit", "l", -1, "dry run")
 	playCmd.Flags().IntVar(&args.skip, "skip", 0, "songs to skip from the start")
@@ -78,6 +79,12 @@ func Setup(rootCmd *cobra.Command) {
 }
 
 func run(args PlayArgs, terms []string) {
+	log.SetFlags(0)
+
+	if args.sortType != "a" && args.sortType != "c" && args.sortType != "m" {
+		log.Fatal("Error: invalid --sort-type, expected value of 'a'|'c'|'m'")
+	}
+
 	if args.live {
 		return
 	}
@@ -156,7 +163,7 @@ func getSongs(args PlayArgs, terms []string) []Song {
 		}
 
 		if doesSongPass(args, storedTags, terms, strings.ToLower(fileName)) {
-			stat, statErr := os.Stat(fileName)
+			stat, statErr := times.Stat(fileName)
 
 			if statErr != nil {
 				fmt.Println(statErr)
@@ -176,7 +183,7 @@ func getSongs(args PlayArgs, terms []string) []Song {
 	}
 
 	if args.new || args.skipOldFirst {
-		sortByNew(songs)
+		sortByNew(songs, args.sortType)
 	}
 
 	if args.skip > 0 {
@@ -189,7 +196,7 @@ func getSongs(args PlayArgs, terms []string) []Song {
 
 	// !new && !skipOldFirst to make sure we don't uselessly sort again
 	if args.playNewFirst && !args.new && !args.skipOldFirst {
-		sortByNew(songs)
+		sortByNew(songs, args.sortType)
 	}
 
 	if args.editor {
