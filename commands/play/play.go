@@ -101,23 +101,41 @@ func run(args PlayArgs, terms []string) {
 
 	if len(terms) == 0 && args.limit != 0 && !args.dryPaths && !args.playNewFirst && !args.new && !args.editor && len(args.tags) == 0 {
 		fmt.Println("Playing all songs")
-		runVLC(args, []string{"--recursive=expand", args.musicPath})
+		err := runVLC(args, []string{"--recursive=expand", args.musicPath})
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		return
 	}
 
 	songs := getSongs(args, terms)
 
+	if len(songs) == 0 {
+		fmt.Println("Didn't match anything")
+		return
+	}
+
 	if args.addToTag != "" {
-		changeSongsInTag(args.musicPath, args.addToTag, songs, true)
+		err := changeSongsInTag(args.musicPath, args.addToTag, songs, true)
+
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if args.setToTag != "" {
-		changeSongsInTag(args.musicPath, args.setToTag, songs, false)
+		err := changeSongsInTag(args.musicPath, args.setToTag, songs, false)
+
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if args.dryPaths {
 		for _, s := range songs {
-			fmt.Println(s.path)
+			fmt.Println(s)
 		}
 
 		return
@@ -134,16 +152,20 @@ func run(args PlayArgs, terms []string) {
 
 	for _, s := range songs {
 		if !isPlayingAll {
-			fmt.Printf("- %s\n", strings.Replace(s.path, args.musicPath+"/", "", 1))
+			fmt.Printf("- %s\n", strings.Replace(s, args.musicPath+"/", "", 1))
 		}
 
-		vlcArgs = append(vlcArgs, s.path)
+		vlcArgs = append(vlcArgs, s)
 	}
 
-	runVLC(args, vlcArgs)
+	err := runVLC(args, vlcArgs)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
-func getSongs(args PlayArgs, terms []string) []Song {
+func getSongs(args PlayArgs, terms []string) []string {
 	songs := []Song{}
 	canEndEarly := !args.new && !args.skipOldFirst && !args.playNewFirst
 
@@ -179,7 +201,7 @@ func getSongs(args PlayArgs, terms []string) []Song {
 	filepath.WalkDir(args.musicPath, walk)
 
 	if len(songs) == 0 {
-		return songs
+		return []string{}
 	}
 
 	if args.new || args.skipOldFirst {
@@ -199,16 +221,28 @@ func getSongs(args PlayArgs, terms []string) []Song {
 		sortByNew(songs, args.sortType)
 	}
 
-	if args.editor {
-		return nil
+	flatSongs := make([]string, len(songs))
+
+	for i, s := range songs {
+		flatSongs[i] = s.path
 	}
 
-	return songs
+	if args.editor {
+		editedSongs, err := editSongList(flatSongs)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		flatSongs = editedSongs
+	}
+
+	return flatSongs
 }
 
-func runVLC(args PlayArgs, vlcArgs []string) {
+func runVLC(args PlayArgs, vlcArgs []string) error {
 	if args.dryRun {
-		return
+		return nil
 	}
 
 	if args.new || args.playNewFirst {
@@ -231,7 +265,5 @@ func runVLC(args PlayArgs, vlcArgs []string) {
 		err = exec.Command("vlc", vlcArgs...).Start()
 	}
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	return err
 }

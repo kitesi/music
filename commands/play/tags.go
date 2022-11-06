@@ -40,7 +40,7 @@ func getStoredTags(musicPath string) []Tag {
 	return savedTags
 }
 
-func changeSongsInTag(musicPath string, tagName string, songs []Song, shouldAppend bool) {
+func changeSongsInTag(musicPath string, tagName string, songs []string, shouldAppend bool) error {
 	var tag Tag
 
 	tags := getStoredTags(musicPath)
@@ -58,7 +58,7 @@ func changeSongsInTag(musicPath string, tagName string, songs []Song, shouldAppe
 	}
 
 	for _, song := range songs {
-		bareName := strings.Replace(song.path, musicPath, "", 1)
+		bareName := strings.Replace(song, musicPath, "", 1)
 
 		if includes(tag.Songs, bareName) {
 			tag.Songs = append(tag.Songs, bareName)
@@ -68,12 +68,9 @@ func changeSongsInTag(musicPath string, tagName string, songs []Song, shouldAppe
 	tagsString, err := json.Marshal(tags)
 
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	err = os.WriteFile(getTagPath(musicPath), tagsString, 0666)
-
-	if err != nil {
-		log.Fatal(err)
-	}
+	return err
 }
