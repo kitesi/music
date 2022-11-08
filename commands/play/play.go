@@ -1,6 +1,7 @@
 package play
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -39,18 +40,7 @@ type PlayArgs struct {
 	skip             int
 }
 
-func Setup(rootCmd *cobra.Command) {
-	var args = PlayArgs{}
-
-	var playCmd = &cobra.Command{
-		Use:   "play [terms..]",
-		Short: "play music",
-		Long:  "play music",
-		Run: func(cmd *cobra.Command, terms []string) {
-			run(args, terms)
-		},
-	}
-
+func addFlags(playCmd *cobra.Command, args *PlayArgs) {
 	playCmd.Flags().BoolVarP(&args.dryRun, "dry-run", "d", false, "dry run")
 	playCmd.Flags().BoolVarP(&args.dryPaths, "dry-paths", "p", false, "dry paths")
 	playCmd.Flags().BoolVarP(&args.random, "random", "z", false, "play by random")
@@ -73,30 +63,42 @@ func Setup(rootCmd *cobra.Command) {
 
 	playCmd.Flags().IntVarP(&args.limit, "limit", "l", -1, "dry run")
 	playCmd.Flags().IntVar(&args.skip, "skip", 0, "songs to skip from the start")
-
-	rootCmd.AddCommand(playCmd)
-
 }
 
-func run(args PlayArgs, terms []string) {
+func generateCommand() (*cobra.Command, *PlayArgs) {
+	args := PlayArgs{}
+
+	playCmd := &cobra.Command{
+		Use:   "play [terms..]",
+		Short: "play music",
+		Long:  "play music",
+	}
+
+	addFlags(playCmd, &args)
+	return playCmd, &args
+}
+
+func Setup(rootCmd *cobra.Command) {
+	playCmd, args := generateCommand()
+
+	playCmd.Run = func(_ *cobra.Command, terms []string) {
+		mainRunner(args, terms)
+	}
+
+	rootCmd.AddCommand(playCmd)
+}
+
+func mainRunner(args *PlayArgs, terms []string) {
 	log.SetFlags(0)
 
-	if args.sortType != "a" && args.sortType != "c" && args.sortType != "m" {
-		log.Fatal("Error: invalid --sort-type, expected value of 'a'|'c'|'m'")
-	}
-
 	if args.live {
-		return
-	}
-
-	if args.musicPath == "" {
-		dirname, err := os.UserHomeDir()
+		err := liveQueryResults()
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		args.musicPath = filepath.Join(dirname, "Music")
+		return
 	}
 
 	if len(terms) == 0 && args.limit != 0 && !args.dryPaths && !args.playNewFirst && !args.new && !args.editor && len(args.tags) == 0 {
@@ -110,7 +112,11 @@ func run(args PlayArgs, terms []string) {
 		return
 	}
 
-	songs := getSongs(args, terms)
+	songs, err := getSongs(args, terms)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if len(songs) == 0 {
 		fmt.Println("Didn't match anything")
@@ -158,14 +164,34 @@ func run(args PlayArgs, terms []string) {
 		vlcArgs = append(vlcArgs, s)
 	}
 
-	err := runVLC(args, vlcArgs)
+	err = runVLC(args, vlcArgs)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func getSongs(args PlayArgs, terms []string) []string {
+func getDefaultMusicPath() (string, error) {
+	dirname, err := os.UserHomeDir()
+	return filepath.Join(dirname, "Music"), err
+
+}
+
+func getSongs(args *PlayArgs, terms []string) ([]string, error) {
+	if args.sortType != "a" && args.sortType != "c" && args.sortType != "m" {
+		return nil, errors.New("invalid --sort-type, expected value of 'a'|'c'|'m'")
+	}
+
+	if args.musicPath == "" {
+		defaultMusicPath, err := getDefaultMusicPath()
+
+		if err != nil {
+			return nil, err
+		}
+
+		args.musicPath = defaultMusicPath
+	}
+
 	songs := []Song{}
 	canEndEarly := !args.new && !args.skipOldFirst && !args.playNewFirst
 
@@ -201,7 +227,7 @@ func getSongs(args PlayArgs, terms []string) []string {
 	filepath.WalkDir(args.musicPath, walk)
 
 	if len(songs) == 0 {
-		return []string{}
+		return []string{}, nil
 	}
 
 	if args.new || args.skipOldFirst {
@@ -237,10 +263,10 @@ func getSongs(args PlayArgs, terms []string) []string {
 		flatSongs = editedSongs
 	}
 
-	return flatSongs
+	return flatSongs, nil
 }
 
-func runVLC(args PlayArgs, vlcArgs []string) error {
+func runVLC(args *PlayArgs, vlcArgs []string) error {
 	if args.dryRun {
 		return nil
 	}

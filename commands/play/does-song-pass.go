@@ -2,7 +2,7 @@ package play
 
 import "strings"
 
-func doesSongPass(args PlayArgs, savedTags []Tag, terms []string, songPath string) bool {
+func doesSongPass(args *PlayArgs, savedTags []Tag, terms []string, songPath string) bool {
 	if len(terms) == 0 && len(args.tags) == 0 {
 		return true
 	}
