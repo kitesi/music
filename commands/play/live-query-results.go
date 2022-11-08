@@ -20,7 +20,7 @@ func moveCursorUp(amount int) {
 	fmt.Printf("\033[%dA", amount)
 }
 
-func moveCursorAbsolute(amount int) {
+func moveCursorHorizontalAbsolute(amount int) {
 	fmt.Printf("\033[%dG", amount)
 }
 
@@ -28,34 +28,45 @@ func writeToScreen(query string, songs []string) error {
 	fmt.Print("\r")
 	clearScreenDown()
 
-	var showenSongs []string
-
-	if len(songs) > maxSongsShoen {
-		showenSongs = songs[:maxSongsShoen]
-	} else {
-		showenSongs = songs
-	}
-
-	queryMessage := "Search: " + query
-	msg := strings.Join(showenSongs, "\r\n")
-
-	fmt.Print(queryMessage + "\r\n----------------------------\r\n" + msg + "\r\n")
-
-	lines := strings.Count(msg, "\n")
-	terminalColumnSize, _, err := term.GetSize(int(os.Stdin.Fd()))
+	terminalColumnSize, terminalRowSize, err := term.GetSize(int(os.Stdin.Fd()))
 
 	if err != nil {
 		return err
 	}
 
+	var showenSongs []string
+	rowLimit := maxSongsShoen
+
+	// -3 for the shell prompt, query message, and horizontal line
+	if terminalRowSize-3 < rowLimit {
+		rowLimit = terminalRowSize - 3
+	}
+
+	if len(songs) > rowLimit {
+		showenSongs = songs[:rowLimit]
+	} else {
+		showenSongs = songs
+	}
+
+	queryMessage := "Search: " + query
+	songsString := strings.Join(showenSongs, "\r\n")
+
+	fmt.Print(queryMessage + "\r\n----------------------------\r\n" + songsString)
+	// could use len(songs) but file names can have \n
+	linesFromSongs := strings.Count(songsString, "\n")
+
 	for _, s := range showenSongs {
 		if len(s) > terminalColumnSize {
-			lines++
+			linesFromSongs++
 		}
 	}
 
-	moveCursorAbsolute(len(queryMessage) + 1)
-	moveCursorUp(lines + 3)
+	linesOverTerminalFromQuery := len(queryMessage) / terminalColumnSize
+
+	// +1 so the cursor isn't on the last letter
+	moveCursorHorizontalAbsolute(len(queryMessage) + 1)
+	// +2 because of the horizontal line and new lines
+	moveCursorUp(linesFromSongs + linesOverTerminalFromQuery + 2)
 
 	return nil
 }
@@ -181,6 +192,8 @@ InfiniteLoop:
 			continue
 		}
 
+		// live parsing of music-path is just not efficient
+		subPlayArgs.musicPath = ""
 		songs, err := getSongs(subPlayArgs, subPlayTerms)
 
 		if err != nil {

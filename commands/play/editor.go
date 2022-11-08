@@ -1,7 +1,7 @@
 package play
 
 import (
-	"log"
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -11,7 +11,7 @@ func editSongList(songs []string) ([]string, error) {
 	editor := os.Getenv("EDITOR")
 
 	if editor == "" {
-		log.Fatal("No EDITOR env variable found")
+		return nil, errors.New("no EDITOR env variable found")
 	}
 
 	file, err := os.CreateTemp("", "music-playlist-*.txt")
@@ -38,7 +38,7 @@ func editSongList(songs []string) ([]string, error) {
 	cont, err := os.ReadFile(file.Name())
 
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	editedSongs := strings.Split(string(cont), "\n")

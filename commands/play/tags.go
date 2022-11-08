@@ -2,7 +2,8 @@ package play
 
 import (
 	"encoding/json"
-	"log"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,33 +18,37 @@ func getTagPath(musicPath string) string {
 	return filepath.Join(musicPath, "tags.json")
 }
 
-func getStoredTags(musicPath string) []Tag {
+func getStoredTags(musicPath string) ([]Tag, error) {
 	var savedTags []Tag
 
 	content, err := os.ReadFile(getTagPath(musicPath))
 
-	if err == os.ErrNotExist {
-		return savedTags
-	} else if err != nil {
-		log.Fatal("Error while opening tags file: ", err)
-	} else {
+	if err == nil {
 		var payload []Tag
 		err = json.Unmarshal(content, &payload)
 
 		if err != nil {
-			log.Fatal("Error during Unmarshal() of tags.json: ", err)
+			return nil, err
 		}
 
 		savedTags = payload
+	} else if errors.Is(err, fs.ErrNotExist) {
+		return savedTags, nil
+	} else {
+		return nil, err
 	}
 
-	return savedTags
+	return savedTags, nil
 }
 
 func changeSongsInTag(musicPath string, tagName string, songs []string, shouldAppend bool) error {
 	var tag Tag
 
-	tags := getStoredTags(musicPath)
+	tags, err := getStoredTags(musicPath)
+
+	if err != nil {
+		return err
+	}
 
 	for _, t := range tags {
 		if t.Name == tagName {

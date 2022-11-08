@@ -195,13 +195,21 @@ func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 	songs := []Song{}
 	canEndEarly := !args.new && !args.skipOldFirst && !args.playNewFirst
 
-	storedTags := getStoredTags(args.musicPath)
+	storedTags, err := getStoredTags(args.musicPath)
+
+	if err != nil {
+		return nil, err
+	}
 
 	if args.limit > 0 && args.skip > 0 {
 		args.limit += args.skip
 	}
 
 	var walk = func(fileName string, dirEntry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
 		if dirEntry.IsDir() {
 			return nil
 		}
@@ -211,11 +219,10 @@ func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 		}
 
 		if doesSongPass(args, storedTags, terms, strings.ToLower(fileName)) {
-			stat, statErr := times.Stat(fileName)
+			stat, err := times.Stat(fileName)
 
-			if statErr != nil {
-				fmt.Println(statErr)
-				return nil
+			if err != nil {
+				return err
 			}
 
 			songs = append(songs, Song{stat, fileName})
@@ -224,7 +231,11 @@ func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 		return nil
 	}
 
-	filepath.WalkDir(args.musicPath, walk)
+	err = filepath.WalkDir(args.musicPath, walk)
+
+	if err != nil {
+		return nil, err
+	}
 
 	if len(songs) == 0 {
 		return []string{}, nil
@@ -257,7 +268,7 @@ func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 		editedSongs, err := editSongList(flatSongs)
 
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 
 		flatSongs = editedSongs

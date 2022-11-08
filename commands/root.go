@@ -1,8 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
+	"log"
 
 	"github.com/kitesi/music/commands/play"
 	"github.com/spf13/cobra"
@@ -16,7 +15,6 @@ func Execute() {
 	play.Setup(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 }
