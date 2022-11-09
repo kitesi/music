@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type Tag struct {
@@ -53,17 +52,19 @@ func changeSongsInTag(musicPath string, tagName string, songs []string, shouldAp
 	for _, t := range tags {
 		if t.Name == tagName {
 			tag = t
+			break
 		}
 	}
 
 	if tag.Name == "" {
-		tag = Tag{Name: tagName, Songs: []string{}}
+		tag = Tag{Name: tagName, Songs: make([]string, 0, len(songs))}
+		tags = append(tags, tag)
 	} else if !shouldAppend {
-		tag.Songs = []string{}
+		tag.Songs = make([]string, 0, len(songs))
 	}
 
 	for _, song := range songs {
-		bareName := strings.Replace(song, musicPath, "", 1)
+		bareName := getBareSongName(song, musicPath)
 
 		if includes(tag.Songs, bareName) {
 			tag.Songs = append(tag.Songs, bareName)

@@ -42,7 +42,7 @@ func editSongList(songs []string) ([]string, error) {
 	}
 
 	editedSongs := strings.Split(string(cont), "\n")
-	filteredEditedSongs := []string{}
+	filteredEditedSongs := make([]string, 0, len(editedSongs))
 
 	for _, s := range editedSongs {
 		if s != "" {

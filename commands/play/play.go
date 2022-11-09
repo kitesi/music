@@ -78,6 +78,17 @@ func generateCommand() (*cobra.Command, *PlayArgs) {
 	return playCmd, &args
 }
 
+func setDefaultMusicPath(args *PlayArgs) error {
+	defaultMusicPath, err := getDefaultMusicPath()
+
+	if err != nil {
+		return err
+	}
+
+	args.musicPath = defaultMusicPath
+	return nil
+}
+
 func Setup(rootCmd *cobra.Command) {
 	playCmd, args := generateCommand()
 
@@ -99,6 +110,12 @@ func mainRunner(args *PlayArgs, terms []string) {
 		}
 
 		return
+	}
+
+	err := setDefaultMusicPath(args)
+
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	if len(terms) == 0 && args.limit != 0 && !args.dryPaths && !args.playNewFirst && !args.new && !args.editor && len(args.tags) == 0 {
@@ -147,28 +164,27 @@ func mainRunner(args *PlayArgs, terms []string) {
 		return
 	}
 
-	vlcArgs := []string{}
 	isPlayingAll := args.limit == -1 && len(terms) == 0 && len(args.tags) == 0 && !args.editor
 
 	if isPlayingAll {
 		fmt.Println("Playing all songs")
 	} else {
 		fmt.Printf("Playing [%d]\n", len(songs))
-	}
 
-	for _, s := range songs {
-		if !isPlayingAll {
-			fmt.Printf("- %s\n", strings.Replace(s, args.musicPath+"/", "", 1))
+		for _, s := range songs {
+			fmt.Printf("- %s\n", getBareSongName(s, args.musicPath))
 		}
-
-		vlcArgs = append(vlcArgs, s)
 	}
 
-	err = runVLC(args, vlcArgs)
+	err = runVLC(args, songs)
 
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func getBareSongName(song string, musicPath string) string {
+	return strings.Replace(song, musicPath+"/", "", 1)
 }
 
 func getDefaultMusicPath() (string, error) {
@@ -180,16 +196,6 @@ func getDefaultMusicPath() (string, error) {
 func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 	if args.sortType != "a" && args.sortType != "c" && args.sortType != "m" {
 		return nil, errors.New("invalid --sort-type, expected value of 'a'|'c'|'m'")
-	}
-
-	if args.musicPath == "" {
-		defaultMusicPath, err := getDefaultMusicPath()
-
-		if err != nil {
-			return nil, err
-		}
-
-		args.musicPath = defaultMusicPath
 	}
 
 	songs := []Song{}

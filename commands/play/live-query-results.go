@@ -24,7 +24,15 @@ func moveCursorHorizontalAbsolute(amount int) {
 	fmt.Printf("\033[%dG", amount)
 }
 
-func writeToScreen(query string, songs []string) error {
+func truncateString(val string, maxLength int) string {
+	if len(val) > maxLength {
+		return val[0:maxLength]
+	}
+
+	return val
+}
+
+func writeToScreen(query string, songs []string, musicPath string) error {
 	fmt.Print("\r")
 	clearScreenDown()
 
@@ -34,13 +42,14 @@ func writeToScreen(query string, songs []string) error {
 		return err
 	}
 
-	var showenSongs []string
 	rowLimit := maxSongsShoen
 
 	// -3 for the shell prompt, query message, and horizontal line
 	if terminalRowSize-3 < rowLimit {
 		rowLimit = terminalRowSize - 3
 	}
+
+	var showenSongs []string
 
 	if len(songs) > rowLimit {
 		showenSongs = songs[:rowLimit]
@@ -49,24 +58,27 @@ func writeToScreen(query string, songs []string) error {
 	}
 
 	queryMessage := "Search: " + query
-	songsString := strings.Join(showenSongs, "\r\n")
+	horizontalLine := fmt.Sprintf("---------------[%d]---------------", len(songs))
+	boilerPlate := fmt.Sprintf("%s\r\n%s\r\n", queryMessage, horizontalLine)
+	linesFromSongs := 0
 
-	fmt.Print(queryMessage + "\r\n----------------------------\r\n" + songsString)
-	// could use len(songs) but file names can have \n
-	linesFromSongs := strings.Count(songsString, "\n")
+	fmt.Print(boilerPlate)
 
-	for _, s := range showenSongs {
-		if len(s) > terminalColumnSize {
+	for i, s := range showenSongs {
+		fmt.Print(truncateString("- "+getBareSongName(s, musicPath), terminalColumnSize))
+
+		if i != len(showenSongs)-1 {
+			fmt.Print("\r\n")
 			linesFromSongs++
 		}
 	}
 
-	linesOverTerminalFromQuery := len(queryMessage) / terminalColumnSize
+	linesFromBoilerPlate := strings.Count(boilerPlate, "\n") + (len(queryMessage) / terminalColumnSize) + (len(horizontalLine) / terminalColumnSize)
 
 	// +1 so the cursor isn't on the last letter
 	moveCursorHorizontalAbsolute(len(queryMessage) + 1)
 	// +2 because of the horizontal line and new lines
-	moveCursorUp(linesFromSongs + linesOverTerminalFromQuery + 2)
+	moveCursorUp(linesFromSongs + linesFromBoilerPlate)
 
 	return nil
 }
@@ -93,14 +105,14 @@ func liveQueryResults() error {
 
 	defer term.Restore(int(os.Stdin.Fd()), oldState)
 
-	writeToScreen("", []string{})
-
 	lastQuery := ""
 	lastSongs := []string{}
 	query := ""
 
 InfiniteLoop:
 	for {
+		writeToScreen(query, lastSongs, subPlayArgs.musicPath)
+
 		b := make([]byte, 1)
 		_, err = os.Stdin.Read(b)
 
@@ -144,18 +156,15 @@ InfiniteLoop:
 			clearScreenDown()
 
 			if len(lastSongs) == 0 {
-				fmt.Println("No songs selected")
+				fmt.Println("No songs selected\r")
 				return nil
 			}
 
-			vlcArgs := []string{}
-
 			for _, s := range lastSongs {
-				vlcArgs = append(vlcArgs, s)
-				fmt.Printf("- %s\r\n", strings.Replace(s, subPlayArgs.musicPath+"/", "", 1))
+				fmt.Printf("- %s\r\n", getBareSongName(s, subPlayArgs.musicPath))
 			}
 
-			runVLC(subPlayArgs, vlcArgs)
+			runVLC(subPlayArgs, lastSongs)
 			return nil
 		}
 
@@ -194,15 +203,14 @@ InfiniteLoop:
 
 		// live parsing of music-path is just not efficient
 		subPlayArgs.musicPath = ""
+		setDefaultMusicPath(subPlayArgs)
+
 		songs, err := getSongs(subPlayArgs, subPlayTerms)
 
 		if err != nil {
 			lastQuery = query
-			writeToScreen(query, lastSongs)
 			continue
 		}
-
-		writeToScreen(query, songs)
 
 		lastSongs = songs
 		lastQuery = query
