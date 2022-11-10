@@ -1,3 +1,90 @@
+# 1.12.0 (8/31/22)
+
+<!-- prettier-ignore -->
+-   add `--append | --enqueue`, this will append songs to your playlist rather than just outright playing them and skipping the current one, default is true 
+-   add `--random | -z`, makes the playlist shuffle (through vlc, doesn't internally shuffle)
+-   fix `--skip` bug
+-   fix `--dry-paths` with `--set-to-tag` or `--add-to-tag`, `--dry-paths` was checked first
+and returned if true, so tags were not set/added, when they should be
+-   check for empty string on `--set-to-tag` and `--add-to-tag`
+-   remove config
+    -   remove `get-config-path` command
+    -   add `--songs-path` for install command
+
+Every option in the config can be done with --flairs. If you need
+default values I recommend setting up an alias with the flairs like so:
+`alias mus="music --songs-path '~/some/dir'"`
+
+# 1.11.0 (8/16/22)
+
+<!-- prettier-ignore -->
+- fix live-search-query
+  - no query worked as terms was not set by default
+  - if a song's name length was greater than the terminal width, it would mess up the cursor position
+  - fix -n not working
+- internal: remove setting config values in middleware, and use the default option in the builder (play-music.ts)
+
+# 1.10.0 (8/09/22)
+
+<!-- prettier-ignore -->
+- add `--skip <number>` => skip songs from the start, mainly implemented it for using it with `-n` or another
+- add tagging system
+
+`--tags | -t <string..>` => this will be an array of tag queries, sorta like the positional terms,
+to stop the array use `--` for example `-t sad \!mid 2019 -- -l5`
+
+Worth noting, tags are case-insensitive.
+
+`--add-to-tag | -a <string>` => add all the valid songs to the specified tag. `-d` will not stop this.
+
+`--set-to-tag` => set all the valid songs to the specified tag. If any songs exist in that tag, they will be removed `-d` will not stop this.
+
+# 1.9.0 (7/11/22)
+
+<!-- prettier-ignore -->
+- moved `open-graph-scraper` to dependency intead of dev
+
+# 1.8.0 (7/11/22)
+
+<!-- prettier-ignore -->
+- add `--live` option, this allows you to type out your query and get live feedback
+for the songs it will play
+- add `-e | --editor` option to modify song list before playing
+
+  this option will create a temporary file and then execute your ENV's
+  default editor and after you finish saving and exiting will read the
+  file content and play the songs based of it
+
+  inspired by rangers `:bulkrename`
+
+- add `-e | --editor` option to modify song name before installing
+  
+  this will fetch the title using open-graph-scraper and then just like before 
+  create a temporary file and use your ENV's editor. 
+
+  ".%(ext)s" is added afterwards.
+
+  can not be used in combination with `-n | --name`
+- add alias `-s` for `--sort-type`
+- fix `--songs-path` argument
+- add completions for `mx` alias if you choose to have that
+
+# 1.7.0 (1/23/22)
+
+<!-- prettier-ignore -->
+- add `-n | --name` to install command, so you can specify the file name
+
+# 1.6.1 (1/11/22)
+
+<!-- prettier-ignore -->
+- add the new bash completion to readme
+
+# 1.6.0 (1/11/22)
+
+<!-- prettier-ignore -->
+- change default command to `play` and `p`
+- better bash completion
+
 # 1.5.0 (11/28/21)
 
 <!-- prettier-ignore -->

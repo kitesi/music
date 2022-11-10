@@ -6,8 +6,8 @@ TEMP_SONGS_DIR="/storage/emulated/0/Temp-Music/"
 
 mkdir "$TEMP_SONGS_DIR"
 
-music $@ -d
+music play $@ -d
 
-music $@ -p | while read line ; do
+music play $@ -p | while read line ; do
     cp "$line" "/storage/emulated/0/Temp-Music"
 done
