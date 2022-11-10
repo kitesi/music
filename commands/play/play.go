@@ -63,7 +63,7 @@ func addFlags(playCmd *cobra.Command, args *PlayArgs) {
 
 	playCmd.Flags().StringVarP(&args.sortType, "sort-type", "s", "m", "timestamp to use when sorting by time (a|m|c)")
 
-	playCmd.Flags().IntVarP(&args.limit, "limit", "l", -1, "dry run")
+	playCmd.Flags().IntVarP(&args.limit, "limit", "l", -1, "limit amount of songs played")
 	playCmd.Flags().IntVar(&args.skip, "skip", 0, "songs to skip from the start")
 }
 
@@ -95,7 +95,7 @@ func Setup(rootCmd *cobra.Command) {
 	playCmd, args := generateCommand()
 
 	playCmd.Run = func(_ *cobra.Command, terms []string) {
-		if err := mainRunner(args, terms); err != nil {
+		if err := playRunner(args, terms); err != nil {
 			log.SetFlags(0)
 			log.Fatal(err)
 		}
@@ -104,7 +104,7 @@ func Setup(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(playCmd)
 }
 
-func mainRunner(args *PlayArgs, terms []string) error {
+func playRunner(args *PlayArgs, terms []string) error {
 	if args.live {
 		return liveQueryResults()
 	}

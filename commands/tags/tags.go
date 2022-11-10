@@ -72,7 +72,7 @@ func Setup(rootCmd *cobra.Command) {
 
 	tagsCmd.Flags().BoolVarP(&args.editor, "editor", "e", false, "edit tags or tag with $EDITOR")
 	tagsCmd.Flags().BoolVarP(&args.shouldDelete, "delete", "d", false, "delete tag")
-	tagsCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "delete tag")
+	tagsCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "music path")
 
 	rootCmd.AddCommand(tagsCmd)
 }
