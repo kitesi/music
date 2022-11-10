@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/djherbis/times"
 	"github.com/spf13/cobra"
+
+	"github.com/kitesi/music/commands/tags"
+	stringUtils "github.com/kitesi/music/string-utils"
 )
 
 type Song struct {
@@ -79,7 +81,7 @@ func generateCommand() (*cobra.Command, *PlayArgs) {
 }
 
 func setDefaultMusicPath(args *PlayArgs) error {
-	defaultMusicPath, err := getDefaultMusicPath()
+	defaultMusicPath, err := stringUtils.GetDefaultMusicPath()
 
 	if err != nil {
 		return err
@@ -93,66 +95,49 @@ func Setup(rootCmd *cobra.Command) {
 	playCmd, args := generateCommand()
 
 	playCmd.Run = func(_ *cobra.Command, terms []string) {
-		mainRunner(args, terms)
+		if err := mainRunner(args, terms); err != nil {
+			log.SetFlags(0)
+			log.Fatal(err)
+		}
 	}
 
 	rootCmd.AddCommand(playCmd)
 }
 
-func mainRunner(args *PlayArgs, terms []string) {
-	log.SetFlags(0)
-
+func mainRunner(args *PlayArgs, terms []string) error {
 	if args.live {
-		err := liveQueryResults()
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		return
+		return liveQueryResults()
 	}
 
-	err := setDefaultMusicPath(args)
-
-	if err != nil {
-		log.Fatal(err)
+	if err := setDefaultMusicPath(args); err != nil {
+		return err
 	}
 
 	if len(terms) == 0 && args.limit != 0 && !args.dryPaths && !args.playNewFirst && !args.new && !args.editor && len(args.tags) == 0 {
 		fmt.Println("Playing all songs")
-		err := runVLC(args, []string{"--recursive=expand", args.musicPath})
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		return
+		return runVLC(args, []string{"--recursive=expand", args.musicPath})
 	}
 
 	songs, err := getSongs(args, terms)
 
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	if len(songs) == 0 {
 		fmt.Println("Didn't match anything")
-		return
+		return nil
 	}
 
 	if args.addToTag != "" {
-		err := changeSongsInTag(args.musicPath, args.addToTag, songs, true)
-
-		if err != nil {
-			log.Fatal(err)
+		if err := tags.ChangeSongsInTag(args.musicPath, args.addToTag, songs, true); err != nil {
+			return nil
 		}
 	}
 
 	if args.setToTag != "" {
-		err := changeSongsInTag(args.musicPath, args.setToTag, songs, false)
-
-		if err != nil {
-			log.Fatal(err)
+		if err := tags.ChangeSongsInTag(args.musicPath, args.setToTag, songs, false); err != nil {
+			return err
 		}
 	}
 
@@ -161,7 +146,7 @@ func mainRunner(args *PlayArgs, terms []string) {
 			fmt.Println(s)
 		}
 
-		return
+		return nil
 	}
 
 	isPlayingAll := args.limit == -1 && len(terms) == 0 && len(args.tags) == 0 && !args.editor
@@ -172,25 +157,11 @@ func mainRunner(args *PlayArgs, terms []string) {
 		fmt.Printf("Playing [%d]\n", len(songs))
 
 		for _, s := range songs {
-			fmt.Printf("- %s\n", getBareSongName(s, args.musicPath))
+			fmt.Printf("- %s\n", stringUtils.GetBareSongName(s, args.musicPath))
 		}
 	}
 
-	err = runVLC(args, songs)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func getBareSongName(song string, musicPath string) string {
-	return strings.Replace(song, musicPath+"/", "", 1)
-}
-
-func getDefaultMusicPath() (string, error) {
-	dirname, err := os.UserHomeDir()
-	return filepath.Join(dirname, "Music"), err
-
+	return runVLC(args, songs)
 }
 
 func getSongs(args *PlayArgs, terms []string) ([]string, error) {
@@ -201,7 +172,7 @@ func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 	songs := []Song{}
 	canEndEarly := !args.new && !args.skipOldFirst && !args.playNewFirst
 
-	storedTags, err := getStoredTags(args.musicPath)
+	storedTags, err := tags.GetStoredTags(args.musicPath)
 
 	if err != nil {
 		return nil, err

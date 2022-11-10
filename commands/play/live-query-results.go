@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
+	stringUtils "github.com/kitesi/music/string-utils"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -65,7 +66,7 @@ func writeToScreen(query string, songs []string, musicPath string) error {
 	fmt.Print(boilerPlate)
 
 	for i, s := range showenSongs {
-		fmt.Print(truncateString("- "+getBareSongName(s, musicPath), terminalColumnSize))
+		fmt.Print(truncateString("- "+stringUtils.GetBareSongName(s, musicPath), terminalColumnSize))
 
 		if i != len(showenSongs)-1 {
 			fmt.Print("\r\n")
@@ -161,7 +162,7 @@ InfiniteLoop:
 			}
 
 			for _, s := range lastSongs {
-				fmt.Printf("- %s\r\n", getBareSongName(s, subPlayArgs.musicPath))
+				fmt.Printf("- %s\r\n", stringUtils.GetBareSongName(s, subPlayArgs.musicPath))
 			}
 
 			runVLC(subPlayArgs, lastSongs)

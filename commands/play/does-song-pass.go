@@ -1,8 +1,13 @@
 package play
 
-import "strings"
+import (
+	"strings"
 
-func doesSongPass(args *PlayArgs, savedTags []Tag, terms []string, songPath string) bool {
+	arrayUtils "github.com/kitesi/music/array-utils"
+	"github.com/kitesi/music/commands/tags"
+)
+
+func doesSongPass(args *PlayArgs, savedTags []tags.Tag, terms []string, songPath string) bool {
 	if len(terms) == 0 && len(args.tags) == 0 {
 		return true
 	}
@@ -17,8 +22,8 @@ func doesSongPass(args *PlayArgs, savedTags []Tag, terms []string, songPath stri
 	}
 
 	var validateTag = func(tag string) bool {
-		return some(savedTags, func(savedTag Tag) bool {
-			return strings.Contains(savedTag.Name, tag) && some(savedTag.Songs, func(s string) bool {
+		return arrayUtils.Some(savedTags, func(savedTag tags.Tag) bool {
+			return strings.Contains(savedTag.Name, tag) && arrayUtils.Some(savedTag.Songs, func(s string) bool {
 				return s == songPath
 			})
 		})
@@ -44,7 +49,7 @@ func doesSongPass(args *PlayArgs, savedTags []Tag, terms []string, songPath stri
 		}
 	}
 
-	if !passedOneTerm && every(terms, func(term string) bool {
+	if !passedOneTerm && arrayUtils.Every(terms, func(term string) bool {
 		return strings.HasPrefix(term, "!")
 	}) {
 		passedOneTerm = true
@@ -57,8 +62,8 @@ func validateQuery(query string, validator func(string) bool) bool {
 	query = strings.TrimPrefix(strings.ToLower(query), "!")
 	requiredSections := strings.Split(query, "#")
 
-	return every(requiredSections, func(section string) bool {
-		return some(strings.Split(section, ","), func(word string) bool {
+	return arrayUtils.Every(requiredSections, func(section string) bool {
+		return arrayUtils.Some(strings.Split(section, ","), func(word string) bool {
 			return validator(word)
 		})
 	})

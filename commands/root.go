@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/kitesi/music/commands/play"
+	"github.com/kitesi/music/commands/tags"
+
 	"github.com/spf13/cobra"
 )
 
@@ -13,8 +13,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	play.Setup(rootCmd)
+	tags.Setup(rootCmd)
 
-	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
+	rootCmd.Execute()
 }

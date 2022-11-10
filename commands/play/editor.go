@@ -1,47 +1,19 @@
 package play
 
 import (
-	"errors"
-	"os"
-	"os/exec"
 	"strings"
+
+	"github.com/kitesi/music/editor"
 )
 
 func editSongList(songs []string) ([]string, error) {
-	editor := os.Getenv("EDITOR")
-
-	if editor == "" {
-		return nil, errors.New("no EDITOR env variable found")
-	}
-
-	file, err := os.CreateTemp("", "music-playlist-*.txt")
-
-	if err != nil {
-		return []string{}, err
-	}
-
-	defer file.Close()
-
-	file.WriteString(strings.Join(songs, "\n"))
-
-	cmd := exec.Command(editor, file.Name())
-
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err = cmd.Run()
-	if err != nil {
-		return []string{}, err
-	}
-
-	cont, err := os.ReadFile(file.Name())
+	content, err := editor.CreateAndModifyTemp("", "music-playlist-*.txt", strings.Join(songs, "\n"))
 
 	if err != nil {
 		return nil, err
 	}
 
-	editedSongs := strings.Split(string(cont), "\n")
+	editedSongs := strings.Split(content, "\n")
 	filteredEditedSongs := make([]string, 0, len(editedSongs))
 
 	for _, s := range editedSongs {
