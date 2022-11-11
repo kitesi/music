@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	arrayUtils "github.com/kitesi/music/array-utils"
 	"github.com/kitesi/music/editor"
@@ -23,35 +24,35 @@ type TagsCommandArgs struct {
 }
 
 type Tag struct {
-	Name  string   `json:"name"`
-	Songs []string `json:"songs"`
+	Songs        []string `json:"songs"`
+	CreationTime int64    `json:"creation_time"`
+	ModifiedTime int64    `json:"modified_time"`
 }
+
+type Tags map[string]Tag
 
 func GetTagPath(musicPath string) string {
 	return filepath.Join(musicPath, "tags.json")
 }
 
-func GetStoredTags(musicPath string) ([]Tag, error) {
-	var savedTags []Tag
+func GetStoredTags(musicPath string) (Tags, error) {
+	storedTags := Tags{}
 
 	content, err := os.ReadFile(GetTagPath(musicPath))
 
 	if err == nil {
-		var payload []Tag
-		err = json.Unmarshal(content, &payload)
+		err = json.Unmarshal(content, &storedTags)
 
 		if err != nil {
 			return nil, err
 		}
-
-		savedTags = payload
 	} else if errors.Is(err, fs.ErrNotExist) {
-		return savedTags, nil
+		return storedTags, nil
 	} else {
 		return nil, err
 	}
 
-	return savedTags, nil
+	return storedTags, nil
 }
 
 func Setup(rootCmd *cobra.Command) {
@@ -116,8 +117,8 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 			return err
 		}
 
-		for _, t := range storedTags {
-			fmt.Println(t.Name)
+		for k := range storedTags {
+			fmt.Println(k)
 		}
 
 		return nil
@@ -129,89 +130,66 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		return err
 	}
 
-	var tag *Tag
-	tagIndex := -1
-
-	for i, t := range storedTags {
-		if t.Name == requestedTagName {
-			tag = &t
-			tagIndex = i
-			break
-		}
-	}
-
-	if args.shouldDelete {
-		storedTags = append(storedTags[:tagIndex], storedTags[tagIndex+1:]...)
-		return updateTagsFile(&storedTags, args.musicPath)
-	}
+	tag, ok := storedTags[requestedTagName]
 
 	if args.editor {
-		if tag == nil {
-			tag = &Tag{}
-		}
-
 		content, err := editor.CreateAndModifyTemp("", requestedTagName+"-*.txt", strings.Join(tag.Songs, "\n"))
 
 		if err != nil {
 			return err
 		}
 
-		tag.Songs = arrayUtils.FilterEmptystrings(strings.Split(content, "\n"))
-
-		if tag.Name == "" {
-			tag.Name = requestedTagName
-			storedTags = append(storedTags, *tag)
-		}
-
-		return updateTagsFile(&storedTags, args.musicPath)
+		return ChangeSongsInTag(args.musicPath, requestedTagName, strings.Split(content, "\n"), false)
 	}
 
-	if tag == nil {
+	if !ok {
 		return fmt.Errorf("Tag \"%s\" does not exist", requestedTagName)
 	}
 
-	fmt.Println(strings.Join(tag.Songs, "\n"))
+	if args.shouldDelete {
+		delete(storedTags, requestedTagName)
+		return updateTagsFile(&storedTags, args.musicPath)
+	}
 
+	fmt.Printf("Amount: %d, Creation: %s, Modified: %s\n", len(tag.Songs), formatTime(tag.ModifiedTime), formatTime(tag.CreationTime))
+	fmt.Println(strings.Join(tag.Songs, "\n"))
 	return nil
 }
 
+func formatTime(timeStamp int64) string {
+	return time.Unix(timeStamp, 0).Format("2006-01-02 15:04:05")
+}
+
 func ChangeSongsInTag(musicPath string, tagName string, songs []string, shouldAppend bool) error {
-	var tag *Tag
 	storedTags, err := GetStoredTags(musicPath)
-	tagIndex := -1
 
 	if err != nil {
 		return err
 	}
 
-	for i, t := range storedTags {
-		if t.Name == tagName {
-			tag = &t
-			tagIndex = i
-			break
-		}
-	}
+	tag, ok := storedTags[tagName]
 
-	if tag == nil {
-		storedTags = append(storedTags, Tag{Name: tagName, Songs: arrayUtils.FilterEmptystrings(songs)})
+	now := time.Now().Unix()
+
+	if !ok {
+		tag = Tag{CreationTime: now, ModifiedTime: now, Songs: arrayUtils.FilterEmptystrings(songs)}
+	} else if !shouldAppend {
+		tag.Songs = arrayUtils.FilterEmptystrings(songs)
 	} else {
-		if !shouldAppend {
-			tag.Songs = make([]string, 0, len(songs))
-		}
-
 		for _, song := range songs {
 			if song != "" && !arrayUtils.Includes(tag.Songs, song) {
 				tag.Songs = append(tag.Songs, song)
 			}
 		}
-
-		storedTags[tagIndex] = *tag
 	}
+
+	tag.ModifiedTime = now
+	storedTags[tagName] = tag
 
 	return updateTagsFile(&storedTags, musicPath)
 }
 
-func updateTagsFile(tags *[]Tag, musicPath string) error {
+func updateTagsFile(tags *Tags, musicPath string) error {
 	tagsString, err := json.Marshal(tags)
 
 	if err != nil {

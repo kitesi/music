@@ -7,7 +7,7 @@ import (
 	"github.com/kitesi/music/commands/tags"
 )
 
-func doesSongPass(args *PlayArgs, savedTags []tags.Tag, terms []string, songPath string) bool {
+func doesSongPass(args *PlayArgs, savedTags tags.Tags, terms []string, songPath string) bool {
 	if len(terms) == 0 && len(args.tags) == 0 {
 		return true
 	}
@@ -22,11 +22,17 @@ func doesSongPass(args *PlayArgs, savedTags []tags.Tag, terms []string, songPath
 	}
 
 	var validateTag = func(tag string) bool {
-		return arrayUtils.Some(savedTags, func(savedTag tags.Tag) bool {
-			return strings.Contains(savedTag.Name, tag) && arrayUtils.Some(savedTag.Songs, func(s string) bool {
-				return s == songPath
-			})
-		})
+		isSong := func(s string) bool {
+			return s == songPath
+		}
+
+		for k, v := range savedTags {
+			if strings.Contains(k, tag) && arrayUtils.Some(v.Songs, isSong) {
+				return true
+			}
+		}
+
+		return false
 	}
 
 	for _, term := range terms {
