@@ -60,7 +60,7 @@ func Setup(rootCmd *cobra.Command) {
 	tagsCmd := &cobra.Command{
 		Use:   "tags [tag]",
 		Short: "Manage tags",
-		Long:  "Lists all the tags be default. If a tag is provided, this will list all the songs in that list.",
+		Long:  "Manage tags. Lists all the tags by default. If a tag is provided, this will list all the songs in that tag.",
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, positional []string) {
 			if err := tagsCommandRunner(&args, positional); err != nil {
@@ -70,9 +70,9 @@ func Setup(rootCmd *cobra.Command) {
 		},
 	}
 
-	tagsCmd.Flags().BoolVarP(&args.editor, "editor", "e", false, "edit tags or tag with $EDITOR")
-	tagsCmd.Flags().BoolVarP(&args.shouldDelete, "delete", "d", false, "delete tag")
-	tagsCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "music path")
+	tagsCmd.Flags().BoolVarP(&args.editor, "editor", "e", false, "edit tags.json or a specific tag with $EDITOR")
+	tagsCmd.Flags().BoolVarP(&args.shouldDelete, "delete", "d", false, "delete a tag")
+	tagsCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "the music path to use")
 
 	rootCmd.AddCommand(tagsCmd)
 }

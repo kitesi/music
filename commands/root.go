@@ -8,12 +8,21 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use: "music",
+	Use:     "music",
+	Version: "1.0.0",
 }
 
 func Execute() {
 	play.Setup(rootCmd)
 	tags.Setup(rootCmd)
+
+	rootCmd.AddGroup(&cobra.Group{
+		ID:    "generic",
+		Title: "Generic Commands",
+	})
+
+	rootCmd.SetCompletionCommandGroupID("generic")
+	rootCmd.SetHelpCommandGroupID("generic")
 
 	rootCmd.Execute()
 }

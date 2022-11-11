@@ -43,27 +43,27 @@ type PlayArgs struct {
 }
 
 func addFlags(playCmd *cobra.Command, args *PlayArgs) {
-	playCmd.Flags().BoolVarP(&args.dryRun, "dry-run", "d", false, "dry run")
-	playCmd.Flags().BoolVarP(&args.dryPaths, "dry-paths", "p", false, "dry paths")
+	playCmd.Flags().BoolVarP(&args.dryRun, "dry-run", "d", false, "dry run vlc")
+	playCmd.Flags().BoolVarP(&args.dryPaths, "dry-paths", "p", false, "only print out paths (absolute)")
 	playCmd.Flags().BoolVarP(&args.random, "random", "z", false, "play by random")
 	playCmd.Flags().BoolVarP(&args.new, "new", "n", false, "play by new and skip old first")
 	playCmd.Flags().BoolVar(&args.playNewFirst, "play-new-first", false, "play by new")
-	playCmd.Flags().BoolVar(&args.skipOldFirst, "skip-old-first", false, "skip old first when there is a limit")
+	playCmd.Flags().BoolVar(&args.skipOldFirst, "skip-old-first", false, "skip old first (when there is a limit)")
 	playCmd.Flags().BoolVarP(&args.persist, "persist", "", false, "persist the command instance")
 	playCmd.Flags().BoolVar(&args.appendToPlaylist, "append", false, "append to playlist rather than jumping")
 	playCmd.Flags().BoolVar(&args.live, "live", false, "go into live query results mode")
-	playCmd.Flags().BoolVarP(&args.editor, "editor", "e", false, "pipe to $EDITOR before playing")
+	playCmd.Flags().BoolVarP(&args.editor, "editor", "e", false, "pipe to $EDITOR for song selection before playing")
 
-	playCmd.Flags().StringVarP(&args.addToTag, "add-to-tag", "a", "", "add to tag")
-	playCmd.Flags().StringVar(&args.setToTag, "set-to-tag", "", "set to tag")
+	playCmd.Flags().StringVarP(&args.addToTag, "add-to-tag", "a", "", "add returned songs to tag")
+	playCmd.Flags().StringVar(&args.setToTag, "set-to-tag", "", "set returned songs to tag")
 	playCmd.Flags().StringVar(&args.vlcPath, "vlc-path", "vlc", "path to vlc executable to use")
-	playCmd.Flags().StringVar(&args.musicPath, "music-path", "", "path to songs")
+	playCmd.Flags().StringVar(&args.musicPath, "music-path", "", "the music path to use")
 
-	playCmd.Flags().StringArrayVarP(&args.tags, "tags", "t", []string{}, "required tags to match")
+	playCmd.Flags().StringArrayVarP(&args.tags, "tags", "t", []string{}, "tags to match")
 
 	playCmd.Flags().StringVarP(&args.sortType, "sort-type", "s", "m", "timestamp to use when sorting by time (a|m|c)")
 
-	playCmd.Flags().IntVarP(&args.limit, "limit", "l", -1, "limit amount of songs played")
+	playCmd.Flags().IntVarP(&args.limit, "limit", "l", -1, "limit the amount of songs played")
 	playCmd.Flags().IntVar(&args.skip, "skip", 0, "songs to skip from the start")
 }
 
@@ -72,8 +72,7 @@ func generateCommand() (*cobra.Command, *PlayArgs) {
 
 	playCmd := &cobra.Command{
 		Use:   "play [terms..]",
-		Short: "play music",
-		Long:  "play music",
+		Short: "Play music with vlc",
 	}
 
 	addFlags(playCmd, &args)

@@ -38,9 +38,9 @@ func init() {
 		},
 	}
 
-	installCmd.Flags().StringVarP(&args.format, "format", "f", "m4a", "format to install")
+	installCmd.Flags().StringVarP(&args.format, "format", "f", "m4a", "format to install to")
 	installCmd.Flags().StringVarP(&args.ytdlArgs, "ytdl-args", "y", "", "additional arguments to send to youtube-dl")
-	installCmd.Flags().StringVarP(&args.ytdlArgs, "name", "n", "", "the file name to install to")
+	installCmd.Flags().StringVarP(&args.name, "name", "n", "", "the file name to install to")
 	installCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "the music path to use")
 
 	rootCmd.AddCommand(installCmd)

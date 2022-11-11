@@ -1,60 +1,33 @@
 # Music CLI
 
-[![NPM version](https://img.shields.io/npm/v/@karizma/music?style=flat-square)](https://www.npmjs.com/package/@karizma/music) [![NPM downloads per week](https://img.shields.io/npm/dw/@karizma/music?color=blue&style=flat-square)](https://www.npmjs.com/package/@karizma/music)
-
-<!-- prettier-ignore -->
-- [About](#about)
-- [Features](#features)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Folder Structure](#folder-structure)
-  - [Playing Music](#playing-music)
-  - [Installing music](#installing-music)
-  - [Auto Completion](#auto-completion)
-  - [Android](#android)
-- [Plans](#plans)
+-   [About](#about)
+-   [Requirements](#requirements)
+-   [Usage](#usage)
+    -   [Playing Music](#playing-music)
+    -   [Tags](#tags)
+    -   [Installing music](#installing-music)
+    -   [Auto Completion](#auto-completion)
 
 ## About
 
-Simple music command line tool mainly for quick and robust querying. Works with local audio files. Does not include a tui, or interactive mode. You can add songs to the current playing playlist by running the command again. Uses vlc internally.
+This is a simple command line tool to help with music-related tasks.
+The primary usage is the querying it provides which allows you to quickly
+select the songs you want to play. This is **not** a music player, it does
+not provide a TUI or GUI, and it uses VLC internally.
 
-## Features
-
-<!-- prettier-ignore -->
-- Lot of filtering options
-  - Dry run to test what matches
-- Tags, works as a playlist system as well
-- Install music with youtube-dl
+For playlists and grouping of songs, it has a tag system. The tags and data are stored
+in your `$MUSIC_PATH/tags.json`.
 
 ## Requirements
 
-<!-- prettier-ignore -->
-- NodeJS
-- VLC
-- youtube-dl (if you plan on installing music with this cli)
-
-## Installation
-
-```shell
-npm install -g @karizma/music
-```
+-   NodeJS
+-   VLC
+-   youtube-dl (if you plan on installing music)
 
 ## Usage
 
-### Configuration
-
-There used to be a file for configuration, but it has been removed
-since it was a hassle to keep it up to date and just mirrored the
-options given through --flairs.
-
-For configurations, I would suggest setting up an alias with your desired options.
-
-### Folder Structure
-
-Any file in your music folder will be considered when querying.
-By default your folder will be located at `$HOME/Music`, but you can use
-`--songs-path` to change it to whatever.
+Each command takes in a music-path argument, which defaults to `$HOME/Music`.
+I recommend a folder structure of:
 
 ```text
 ~/Music/
@@ -65,237 +38,113 @@ By default your folder will be located at `$HOME/Music`, but you can use
         z.mp3
 ```
 
-### Tags
+But this is not a necessary, as any file in your music path will be considered.
 
-Tags are a way to group music, you can use it for playlists, genres or whatever.
-Tags will be stored in `YOUR_MUSIC_PATH/tags.json`
-
-Since there is no global configuration for music path, it will just use the
-provided music path, or the default (`$HOME/Music`).
+Files should follow some basic file naming rules: no new lines, no crazy characters,
+etc.
 
 ### Playing Music
 
-When filtering, the string that's tested is the full path to the file minus your music folder.
+You can play music with the `play` command which will take in
+any amount of positional arguments, these are called terms.
 
-For example, `~/Music/Jaxsoe/Make Time For Me.m4a` would use `Jaxson/Make Time For Me.m4a`.
+A term can have a "!" prefix, meaning it's a negation term, and anything
+that matches that term fails.
 
-Filtering:
+If no term is provided, the program will spawn VLC with the directory
+and `--recursive=expand`.
 
-Songs must match at least one term and not match any negation term.
+Otherwise, a song will have to match at least one of the terms and none
+of the negation terms.
 
-A term is any of the positional arguments, and a negation term is a term that starts with `!`.
+A term can have required sections and one-of sections, specified with "#" and
+"," respectively.
 
-Example: `music blackbear !bad`
+When querying, the string that's tested is the lowercase full path to the file
+minus your music path.
 
-both blackbear and bad are terms, but bad is a negation term. This would match any song that has
-blackbear in the title (or parent folder) except if it has the word 'bad' in the title (or parent folder).
+For example, `~/Music/Jaxsoe/Make Time For Me.m4a` would use
+`jaxson/make time for me.m4a`.
 
-Should note, in bash `!` is a special character, so you will need to escape it, replacing it with `\!`.
+Example of usage:
 
-In a term you can use the symbols `#` to specify another text that must be matched, and `,` to specify an alternative text that may be matched.
+```shell
+music play tonight kiss#me care,bear,say make#you,me#mine \!loser
+```
 
-`music mac#objects` => open all songs that have the words `mac` and `objects` in them
+There are four terms here:
 
-`music sad,bad` => open all songs that have either the word `sad` or `bad` in the title
+-   `tonight`
+-   `kiss#me`
+-   `care,bear,say`
+-   `make#you,me#mine`
+-   `\!loser`
+
+A song will have to match one of those terms and not have the substring "loser".
+
+To match the first term, a song simply needs to have the word "tonight" in the path.
+
+To match the second term, a song needs to have the words "kiss" and "me" in its
+path (not necessarily next to each other).
+
+To match the third term, a song needs to have any of the following words: "care",
+"bear" or "say" in its path.
+
+To match the fourth term, a song needs to have "make", either "you" or "me", and
+"mine" in its path.
+
+To match the fifth term, a song simply needs to not have the word "loser" in its
+path. Also note the backlash, it's there because `!` is a special character in bash.
 
 When combining these, the string is split by `#` first, and then `,`.
-`music mac#blue,objects` => open all songs that have the words `mac` in them,
-and has either `blue` or `objects` in it
 
-Other examples:
+### Tags
 
-`music` => open all songs
+Tags are a way to group music. You can use it for playlists, genres or whatever.
+Tags will be stored in `YOUR_MUSIC_PATH/tags.json`
 
-`music sad` => open all songs that have the word `sad` in the title
+You can view your tags with `music tags`. If you want to see the songs in a tag
+use `music tags <tag>`.
 
-`music blackbear !bad` => open all songs that have the word `blackbear` in them
-but does not have the word `bad`.
+If you want to delete a tag use `--delete` or `-d`. Edit a tag or the `tags.json`
+with `--edit` or `-e`.
 
-Flairs:
-
-`--dry-run | -d` => dry run, show the results, don't actually play any music. tags will still be added/set if specified.
-
-`--dry-paths | -p` => only output all the matching songs, absolute path. This might help with some scripts. tags will still be added/set if specified.
-
-`--limit <number> | -l` => limit the amount of songs played
-
-`--play-new-first | --pnf` => play by newest
-
-`--delete-old-first | --dof` => when used with `--limit`, prioritizes the newest songs from the list
-
-`--new | -n` => `--delete-old-first` and `--play-new-first`
-
-`--persist` => persist the instance of vlc through the cli
-
-`--random` => play music randomly (with vlc controls, doesn't shuffle internally)
-
-`--live` => this allows you to type out your query and get live feedback
-for the songs it will play
-
-`--editor` => option to modify song list before playing
-
-this option will create a temporary file and then execute your ENV's
-default editor and after you finish saving and exiting will read the
-file content and play the songs based of it
-
-`--vlc-path <string>` => specifies the path to vlc to use
-
-`--songs-path <string>` => specifies the songs path to use
-
-`--sort-type | -s <a|m|c>` => specifies the what timestamp to use (access, modified, changed)
-
-`--skip <number>` => skip songs from the start, mainly implemented it for using it with `-n` or another
-sorting option. If you use it with `-l`, the limit will still be the limit. It won't be limit - skip
-
-For example `. -l5 --skip 2` will still result in 5 songs being the max amount.
-
-`--tags | -t <string>` => this will be an array of tag queries, sorta like the positional terms,
-to stop the array use `--` for example `-t sad \!mid 2019 -- -l5`
-
-Worth noting, tags are case-insensitive.
-
-`--add-to-tag | -a <string>` => add all the valid songs to the specified tag. `-d` and `-p` will not stop this.
-
-`--set-to-tag <string>` => set all the valid songs to the specified tag. If any songs exist in that tag, they will be removed. `-d` and `-p` will not stop this.
+The intended way to add songs to a tag is to query the songs with `music play`
+and then using `--add-to-tag | -a <tag>` or `--set-to-tag | -s <tag>`.
 
 ### Installing music
 
 `music install "https://www.youtube.com/watch?v=K4DyBUG242c" ncs` => download from youtube
 
-1st positional argument is the youtube link or id, the second is the folder name.
-The folder name can be pretty loose in comparasion to the real name. Essentially
-it's case insensitive and it replaces spaces with dashes (-).
+The first positional argument is the link to download or a youtube video id. The
+second is the child folder name of your music path to download to. The folder
+name can be pretty loose in comparison to the real name. It's case-insensitive
+and replaces spaces with dashes (-).
+
+For example, if you had a folder named "Kite Hughes", you would use "kite-hughes".
 
 Note: this program does not support piracy.
 
-Flairs:
-
-`--format | -f` => specify what format to download with, default is m4a. All the allowed formats are just what ytdl allows. Currently it is `3gp`, `aac`, `flv`, `m4a`, `mp3`, `mp4`, `ogg`, `wav`, `webm`
-
-`--ytdl-args | -y` => specify any ytdl args to add to the command, example: `--ytdl-args "-4"`
-
-`--name | -n` => specify the file name
-
-`--editor | -e` => opens your editor so you can modify the title before installing. is a bit slower since it needs to fetch the title
-
-`--songs-path` => the music path, defaults to `$HOME/Music`
-
 ### Auto Completion
 
-If you are using bash you can add the following in your `.bashrc`. I think it's pretty
-thorough but if you think there should be more you can create an issue.
+This tool uses [cobra](https://github.com/spf13/cobra) which provides a
+completion command you can use to generate completions.
+
+It works fine, but it doesn't have reactive completion to a few things:
+tags, music subdirectory install, format, and sort-type.
+
+The cobra provided completion is also a bit more descriptive than I personally
+like, which is why I use my own personal bash completion. It can be found in
+`./completion.bash`
 
 Note: I have `mx` as an alias for `music play`
-Note: You need `jq` if you want completions on `--add-to-tag|-a` or `--set-to-tag`
 
-```bash
-MUSIC_PLAY_OPTIONS="--help --version --append --enqueue --live --editor --skip --random --tags --add-to-tag --set-to-tag --dry-paths --play-new-first --delete-old-first --persist --vlc-path --sort-type --songs-path --dry-run --limit --new --pnf --dof --no-persist"
+Note: You need `jq` if you want completions on `--add-to-tag|-a` or
+`--set-to-tag` or `music tags [tag]`
 
-_music_completions()
-{
-    local cur_word="${COMP_WORDS[COMP_CWORD]}"
-    local prev_word="${COMP_WORDS[COMP_CWORD - 1]}"
+It's also more static/hard-coded, so a bit more error-prone/inaccurate.
 
-    local is_install_command=false
-    local is_play_command=false
+### Configuration
 
-    # not the best checking ngl, esp with the aliases "i" and "p", might remove those
-    for i in "${COMP_WORDS[@]}"
-    do
-        if [ "$i" = "install" ] || [ "$i" = "i" ] && [ "${COMP_WORDS[COMP_CWORD]}" != "i" ]; then
-            is_install_command=true
-            break
-        fi
-
-        if [ "$i" = "play" ] || [ "$i" = "p" ] && [ "${COMP_WORDS[COMP_CWORD]}" != "p" ]; then
-            is_play_command=true
-            break
-        fi
-    done
-
-    local last_word_is_install=false
-
-    if [ "$is_play_command" = true ]; then
-        _music_play_completions
-        return 0
-    fi
-
-    case "$prev_word" in
-        install|i)
-            COMPREPLY=( $(compgen -W "https://www.youtube.com/watch?v=" -- ${cur_word}) )
-            last_word_is_install=1
-            ;;
-        --format|-f)
-            COMPREPLY=( $(compgen -W "3gp aac flv m4a mp3 mp4 ogg wav webm" -- ${cur_word}) )
-            ;;
-        *)
-            local generic_options="install play ${MUSIC_PLAY_OPTIONS}"
-            COMPREPLY=( $(compgen -W "${generic_options}" -- ${cur_word}) )
-            ;;
-    esac
-
-    if [ "$is_install_command" = true ] && [ "$last_word_is_install" = false ] ; then
-        # depending how up to date you want this to be, you can set this variable outside of
-        # this function (global scope). It's still pretty fast for me so I personally won't
-        local SONGS_SUB_DIRS=$(basename -a ~/Music/*/ | sed 's/ /-/g' | awk '{print tolower($0)}' | tr '\n' ' ')
-        COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}--format --ytdl-args --name --editor --songs-path" -- ${cur_word}) )
-    fi
-
-    return 0
-}
-
-_music_play_completions() {
-    local cur_word="${COMP_WORDS[COMP_CWORD]}"
-    local prev_word="${COMP_WORDS[COMP_CWORD - 1]}"
-
-    case "$prev_word" in
-        --sort-type|-s)
-            COMPREPLY=( $(compgen -W "a c m" -- ${cur_word}) )
-            ;;
-        --songs-path)
-            COMPREPLY=()
-            ;;
-        --add-to-tag|--set-to-tag|-a)
-            if [ -x "$(which jq)" ]; then
-                local tags=$(jq '.[].name' <~/Music/tags.json)
-                COMPREPLY=( $(compgen -W "$tags" -- ${cur_word}) )
-            else
-                COMPREPLY=( $(compgen -W "${MUSIC_PLAY_OPTIONS}" -- ${cur_word}) )
-            fi
-            ;;
-        *)
-            COMPREPLY=( $(compgen -W "${MUSIC_PLAY_OPTIONS}" -- ${cur_word}) )
-            ;;
-    esac
-
-    return 0
-}
-
-complete -F _music_completions -o default music
-complete -F _music_play_completions -o default mx
-
-```
-
-### Android
-
-If you want to use this on android, you can, but it's not as great.
-Basically you can use the filtering aspect of this program, and copy all the
-files to a directory, and then play that directory on vlc.
-
-You can also make a playlist with just that directory, which is what I do.
-
-You can also use the install command.
-
-You will need termux and the vlc app downloaded.
-
-1. Install nodejs `pkg install nodejs`
-2. Copy `android-termux-mx` to `/data/data/com.termux/files/usr/bin`
-3. Make mx executable with `chmod +x /data/data/com.termux/files/usr/bin/mx`
-
-```bash
-pkg install nodejs
-curl https://raw.githubusercontent.com/karizma/music-cli/main/android-termux-mx > /data/data/com.termux/files/usr/bin/mx
-chmod +x /data/data/com.termux/files/usr/bin/mx
-```
-
-Now you can run mx like so: `mx jacob`
+There is no configuration file currently. I would suggest setting up an alias
+with your desired options.
