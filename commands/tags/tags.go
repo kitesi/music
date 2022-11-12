@@ -18,7 +18,7 @@ import (
 )
 
 type TagsCommandArgs struct {
-	editor       bool
+	edit         bool
 	shouldDelete bool
 	musicPath    string
 }
@@ -59,10 +59,9 @@ func Setup(rootCmd *cobra.Command) {
 	args := TagsCommandArgs{}
 
 	tagsCmd := &cobra.Command{
-		Use:   "tags [tag]",
+		Use:   "tags [tags..]",
 		Short: "Manage tags",
 		Long:  "Manage tags. Lists all the tags by default. If a tag is provided, this will list all the songs in that tag.",
-		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, positional []string) {
 			if err := tagsCommandRunner(&args, positional); err != nil {
 				log.SetFlags(0)
@@ -71,7 +70,7 @@ func Setup(rootCmd *cobra.Command) {
 		},
 	}
 
-	tagsCmd.Flags().BoolVarP(&args.editor, "editor", "e", false, "edit tags.json or a specific tag with $EDITOR")
+	tagsCmd.Flags().BoolVarP(&args.edit, "editor", "e", false, "edit tags.json or a specific tag with $EDITOR")
 	tagsCmd.Flags().BoolVarP(&args.shouldDelete, "delete", "d", false, "delete a tag")
 	tagsCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "the music path to use")
 
@@ -79,18 +78,12 @@ func Setup(rootCmd *cobra.Command) {
 }
 
 func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
-	requestedTagName := ""
-
-	if len(positional) > 0 {
-		requestedTagName = positional[0]
-	}
-
 	if args.shouldDelete {
-		if args.editor {
+		if args.edit {
 			return errors.New("can't have --delete and --editor together")
 		}
 
-		if requestedTagName == "" {
+		if len(positional) == 0 {
 			return errors.New("can't use --delete without a tag")
 		}
 	}
@@ -105,8 +98,8 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		args.musicPath = defaultMusicPath
 	}
 
-	if requestedTagName == "" {
-		if args.editor {
+	if len(positional) == 0 {
+		if args.edit {
 			_, err := editor.EditFile(GetTagPath(args.musicPath))
 			return err
 		}
@@ -130,29 +123,43 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		return err
 	}
 
-	tag, ok := storedTags[requestedTagName]
+	for _, requestedTagName := range positional {
+		tag, ok := storedTags[requestedTagName]
 
-	if args.editor {
-		content, err := editor.CreateAndModifyTemp("", requestedTagName+"-*.txt", strings.Join(tag.Songs, "\n"))
+		if args.edit {
+			content, err := editor.CreateAndModifyTemp("", requestedTagName+"-*.txt", strings.Join(tag.Songs, "\n"))
 
-		if err != nil {
-			return err
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				continue
+			}
+
+			if err = ChangeSongsInTag(args.musicPath, requestedTagName, strings.Split(content, "\n"), false); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
+
+			continue
 		}
 
-		return ChangeSongsInTag(args.musicPath, requestedTagName, strings.Split(content, "\n"), false)
-	}
+		if !ok {
+			fmt.Fprintf(os.Stderr, "Error: tag \"%s\" does not exist\n", requestedTagName)
+			continue
+		}
 
-	if !ok {
-		return fmt.Errorf("Tag \"%s\" does not exist", requestedTagName)
-	}
+		if args.shouldDelete {
+			delete(storedTags, requestedTagName)
 
-	if args.shouldDelete {
-		delete(storedTags, requestedTagName)
-		return updateTagsFile(&storedTags, args.musicPath)
-	}
+			if err := updateTagsFile(&storedTags, args.musicPath); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
 
-	fmt.Printf("Amount: %d, Creation: %s, Modified: %s\n", len(tag.Songs), formatTime(tag.ModifiedTime), formatTime(tag.CreationTime))
-	fmt.Println(strings.Join(tag.Songs, "\n"))
+			continue
+		}
+
+		fmt.Printf("Name: %s, Amount: %d, Creation: %s, Modified: %s\n", requestedTagName, len(tag.Songs), formatTime(tag.ModifiedTime), formatTime(tag.CreationTime))
+		fmt.Println(strings.Join(tag.Songs, "\n"))
+
+	}
 	return nil
 }
 

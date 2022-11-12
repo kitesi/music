@@ -31,7 +31,7 @@ type PlayArgs struct {
 	persist          bool
 	appendToPlaylist bool
 	live             bool
-	editor           bool
+	edit             bool
 	tags             []string
 	addToTag         string
 	setToTag         string
@@ -52,7 +52,7 @@ func addFlags(playCmd *cobra.Command, args *PlayArgs) {
 	playCmd.Flags().BoolVarP(&args.persist, "persist", "", false, "persist the command instance")
 	playCmd.Flags().BoolVar(&args.appendToPlaylist, "append", false, "append to playlist rather than jumping")
 	playCmd.Flags().BoolVar(&args.live, "live", false, "go into live query results mode")
-	playCmd.Flags().BoolVarP(&args.editor, "editor", "e", false, "pipe to $EDITOR for song selection before playing")
+	playCmd.Flags().BoolVarP(&args.edit, "edit", "e", false, "pipe to $EDITOR for song selection before playing")
 
 	playCmd.Flags().StringVarP(&args.addToTag, "add-to-tag", "a", "", "add returned songs to tag")
 	playCmd.Flags().StringVar(&args.setToTag, "set-to-tag", "", "set returned songs to tag")
@@ -112,7 +112,7 @@ func playRunner(args *PlayArgs, terms []string) error {
 		return err
 	}
 
-	if len(terms) == 0 && args.limit != 0 && !args.dryPaths && !args.playNewFirst && !args.new && !args.editor && len(args.tags) == 0 {
+	if len(terms) == 0 && args.limit != 0 && !args.dryPaths && !args.playNewFirst && !args.new && !args.edit && len(args.tags) == 0 {
 		fmt.Println("Playing all songs")
 		return runVLC(args, []string{"--recursive=expand", args.musicPath})
 	}
@@ -148,7 +148,7 @@ func playRunner(args *PlayArgs, terms []string) error {
 		return nil
 	}
 
-	isPlayingAll := args.limit == -1 && len(terms) == 0 && len(args.tags) == 0 && !args.editor
+	isPlayingAll := args.limit == -1 && len(terms) == 0 && len(args.tags) == 0 && !args.edit
 
 	if isPlayingAll {
 		fmt.Println("Playing all songs")
@@ -240,7 +240,7 @@ func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 		flatSongs[i] = s.path
 	}
 
-	if args.editor {
+	if args.edit {
 		editedSongs, err := editSongList(flatSongs)
 
 		if err != nil {
