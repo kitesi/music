@@ -57,8 +57,8 @@ _music_install_completions() {
         *)
             # depending how up to date you want this to be, you can set this variable outside of
             # this function (global scope). It's still pretty fast for me so I personally won't
-            local music_sub_dirs=$(basename -a $MUSIC_PATH/*/ | sed 's/ /-/g' | awk '{print tolower($0)}' | tr '\n' ' ')
-            COMPREPLY=( $(compgen -W "${music_sub_dirs[*]}--format --ytdl-args --name --editor --music-path --help" -- ${cur_word}) )
+            local SONGS_SUB_DIRS=$(basename -a $MUSIC_PATH/*/ | sed 's/ /-/g' | awk '{print tolower($0)}' | tr '\n' ' ')
+            COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}--format --ytdl-args --name --editor --music-path --help" -- ${cur_word}) )
             ;;
     esac
     
@@ -77,7 +77,7 @@ _music_tags_completions() {
     local options="--editor --help --music-path --delete"
 
     if [ -x "$(which jq)" ]; then
-        options+=" $(jq '.[].name' <$MUSIC_PATH/tags.json)"
+        options+=" $(jq 'keys[]' <$MUSIC_PATH/tags.json)"
     fi
 
     COMPREPLY=( $(compgen -W "$options" -- $cur_word ) )
@@ -98,7 +98,7 @@ _music_play_completions() {
             ;; 
         --add-to-tag|--set-to-tag|-a)
             if [ -x "$(which jq)" ]; then
-                local tags=$(jq '.[].name' <$MUSIC_PATH/tags.json)
+                local tags=$(jq 'keys[]' <$MUSIC_PATH/tags.json)
                 COMPREPLY=( $(compgen -W "$tags" -- $cur_word) )
             else
                 COMPREPLY=( $(compgen -W "$generic_options" -- $cur_word) )
@@ -113,4 +113,5 @@ _music_play_completions() {
 }
 
 complete -F _music_completions -o default music
+complete -F _music_completions -o default m
 complete -F _music_play_completions -o default mx

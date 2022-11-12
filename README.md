@@ -137,7 +137,7 @@ The cobra provided completion is also a bit more descriptive than I personally
 like, which is why I use my own personal bash completion. It can be found in
 `./completion.bash`
 
-Note: I have `mx` as an alias for `music play`
+Note: I have `m` as an alias for `music` and `mx` as an alias for `music play`
 
 Note: You need `jq` if you want completions on `--add-to-tag|-a` or
 `--set-to-tag` or `music tags [tag]`
