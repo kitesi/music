@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -75,7 +74,6 @@ func installRunner(args *InstallArgs, positional []string) error {
 			continue
 		}
 
-		fmt.Println(formatFolderName(f.Name(), re))
 		if formatFolderName(f.Name(), re) == adjustedFolder {
 			if selectedFolder != "" {
 				return errors.New("folder matches more than one folder")
@@ -106,7 +104,7 @@ func installRunner(args *InstallArgs, positional []string) error {
 	}
 
 	finalCmdArgs := []string{
-		"-f", args.format, "-o", filepath.Join(args.musicPath, selectedFolder, outputTemplate),
+		"--no-playlist", "-f", args.format, "-o", filepath.Join(args.musicPath, selectedFolder, outputTemplate),
 	}
 
 	if args.ytdlArgs != "" {

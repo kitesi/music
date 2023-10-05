@@ -15,12 +15,12 @@ The primary usage is the querying it provides which allows you to quickly
 select the songs you want to play. This is **not** a music player, it does
 not provide a TUI or GUI, and it uses VLC internally.
 
-For playlists and grouping of songs, it has a tag system. The tags and data are stored
-in your `$MUSIC_PATH/tags.json`.
+For playlists and grouping of songs, it has a tag system. The tags and data are stored in your `$MUSIC_PATH/tags.json`.
+
+This program does not support piracy; you should have the rights to all your files.
 
 ## Requirements
 
--   NodeJS
 -   VLC
 -   youtube-dl (if you plan on installing music)
 
@@ -40,8 +40,7 @@ I recommend a folder structure of:
 
 But this is not a necessary, as any file in your music path will be considered.
 
-Files should follow some basic file naming rules: no new lines, no crazy characters,
-etc.
+Files should follow some basic file naming rules: no new lines, no crazy characters, etc.
 
 ### Playing Music
 
@@ -63,45 +62,40 @@ A term can have required sections and one-of sections, specified with "#" and
 When querying, the string that's tested is the lowercase full path to the file
 minus your music path.
 
-For example, `~/Music/Jaxsoe/Make Time For Me.m4a` would use
+For example, `~/Music/Jaxson/Make Time For Me.m4a` would use
 `jaxson/make time for me.m4a`.
 
 Example of usage:
 
 ```shell
-music play tonight kiss#me care,bear,say make#you,me#mine \!loser
+music play tonight monday#mornings care,bear,say make#you,me#believe \!joe
 ```
 
 There are four terms here:
 
 -   `tonight`
--   `kiss#me`
+-   `monday#mornings`
 -   `care,bear,say`
--   `make#you,me#mine`
--   `\!loser`
+-   `make#you,me#believe`
+-   `\!joe`
 
-A song will have to match one of those terms and not have the substring "loser".
+A song will have to match one of those terms and not have the substring "joe".
 
 To match the first term, a song simply needs to have the word "tonight" in the path.
 
-To match the second term, a song needs to have the words "kiss" and "me" in its
-path (not necessarily next to each other).
+To match the second term, a song needs to have the words "monday" and "mornings" in its path (not necessarily next to each other).
 
-To match the third term, a song needs to have any of the following words: "care",
-"bear" or "say" in its path.
+To match the third term, a song needs to have any of the following words: "care", "bear" or "say" in its path.
 
-To match the fourth term, a song needs to have "make", either "you" or "me", and
-"mine" in its path.
+To match the fourth term, a song needs to have "make", either "you" or "me", and "believe" in its path.
 
-To match the fifth term, a song simply needs to not have the word "loser" in its
-path. Also note the backlash, it's there because `!` is a special character in bash.
+To match the fifth term, a song simply needs to not have the word "joe" in its path. The backlash is there because `!` is a special character in bash.
 
 When combining these, the string is split by `#` first, and then `,`.
 
 ### Tags
 
-Tags are a way to group music. You can use it for playlists, genres or whatever.
-Tags will be stored in `YOUR_MUSIC_PATH/tags.json`
+Tags are a way to group music. You can use it for playlists, genres or whatever. Tags will be stored in `$MUSIC_PATH/tags.json`
 
 You can view your tags with `music tags`. If you want to see the songs in a tag
 use `music tags <tag>`.
@@ -123,7 +117,10 @@ and replaces spaces with dashes (-).
 
 For example, if you had a folder named "Kite Hughes", you would use "kite-hughes".
 
-Note: this program does not support piracy.
+### Other Cool Features
+
+You can use `music play --live` to get a live query search of your songs.
+I personally bind this command to a keybinding of `Ctrl+Alt+m`
 
 ### Auto Completion
 
