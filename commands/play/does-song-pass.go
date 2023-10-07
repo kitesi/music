@@ -15,15 +15,15 @@ func doesSongPass(args *PlayArgs, savedTags tags.Tags, terms []string, songPath 
 	passedOneTerm := len(terms) == 0
 	passedTagRequirement := len(args.tags) == 0
 
-	songPath = strings.Replace(songPath, strings.ToLower(args.musicPath)+"/", "", 1)
+	relativeSongPath := strings.Replace(songPath, strings.ToLower(args.musicPath)+"/", "", 1)
 
 	var validateTerm = func(term string) bool {
-		return strings.Contains(songPath, term)
+		return strings.Contains(relativeSongPath, term)
 	}
 
 	var validateTag = func(tag string) bool {
 		isSong := func(s string) bool {
-			return s == songPath
+			return strings.ToLower(s) == songPath
 		}
 
 		for k, v := range savedTags {
