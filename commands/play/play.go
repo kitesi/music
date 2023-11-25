@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/djherbis/times"
 	"github.com/spf13/cobra"
@@ -275,7 +276,21 @@ func runVLC(args *PlayArgs, vlcArgs []string) error {
 	if args.persist {
 		err = exec.Command("vlc", vlcArgs...).Run()
 	} else {
-		err = exec.Command("vlc", vlcArgs...).Start()
+		cmd := exec.Command("vlc", vlcArgs...)
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+		err := cmd.Start()
+
+		if err != nil {
+			return err
+		}
+
+		// Detach the terminal
+		_, err = syscall.Setsid()
+
+		if err != nil {
+			return err
+		}
 	}
 
 	return err

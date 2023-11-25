@@ -11,14 +11,22 @@ import (
 	"golang.org/x/term"
 )
 
-const maxSongsShoen int = 20
+const maxSongsShown int = 20
 
 func clearScreenDown() {
 	fmt.Print("\x1b[0J")
 }
 
+func clearScreenUp() {
+	fmt.Print("\x1b[1J")
+}
+
 func moveCursorUp(amount int) {
 	fmt.Printf("\033[%dA", amount)
+}
+
+func moveCursorVerticalAbsolute(amount int) {
+	fmt.Printf("\033[%dH", amount)
 }
 
 func moveCursorHorizontalAbsolute(amount int) {
@@ -34,8 +42,8 @@ func truncateString(val string, maxLength int) string {
 }
 
 func writeToScreen(query string, songs []string, musicPath string) error {
-	fmt.Print("\r")
 	clearScreenDown()
+	fmt.Print("\r")
 
 	terminalColumnSize, terminalRowSize, err := term.GetSize(int(os.Stdin.Fd()))
 
@@ -43,32 +51,32 @@ func writeToScreen(query string, songs []string, musicPath string) error {
 		return err
 	}
 
-	rowLimit := maxSongsShoen
+	rowLimit := maxSongsShown
 
 	// -3 for the shell prompt, query message, and horizontal line
 	if terminalRowSize-3 < rowLimit {
 		rowLimit = terminalRowSize - 3
 	}
 
-	var showenSongs []string
+	var shownSongs []string
 
 	if len(songs) > rowLimit {
-		showenSongs = songs[:rowLimit]
+		shownSongs = songs[:rowLimit]
 	} else {
-		showenSongs = songs
+		shownSongs = songs
 	}
 
 	queryMessage := "Search: " + query
-	horizontalLine := fmt.Sprintf("---------------[%d]---------------", len(songs))
+	horizontalLine := fmt.Sprintf("───────────────[%d]───────────────", len(songs))
 	boilerPlate := fmt.Sprintf("%s\r\n%s\r\n", queryMessage, horizontalLine)
 	linesFromSongs := 0
 
 	fmt.Print(boilerPlate)
 
-	for i, s := range showenSongs {
+	for i, s := range shownSongs {
 		fmt.Print(truncateString("- "+stringUtils.GetBareSongName(s, musicPath), terminalColumnSize))
 
-		if i != len(showenSongs)-1 {
+		if i != len(shownSongs)-1 {
 			fmt.Print("\r\n")
 			linesFromSongs++
 		}
@@ -109,6 +117,9 @@ func liveQueryResults() error {
 	lastQuery := ""
 	lastSongs := []string{}
 	query := ""
+
+	clearScreenUp()
+	moveCursorVerticalAbsolute(0)
 
 InfiniteLoop:
 	for {

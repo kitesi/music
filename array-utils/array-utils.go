@@ -26,7 +26,7 @@ func Includes[T comparable](arr []T, item T) bool {
 	})
 }
 
-func FilterEmptystrings(arr []string) []string {
+func FilterEmptyStrings(arr []string) []string {
 	output := make([]string, 0, len(arr))
 
 	for _, item := range arr {

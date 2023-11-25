@@ -1,6 +1,7 @@
 # Music CLI
 
 -   [About](#about)
+-   [Installation](#installation)
 -   [Requirements](#requirements)
 -   [Usage](#usage)
     -   [Playing Music](#playing-music)
@@ -23,6 +24,9 @@ This program does not support piracy; you should have the rights to all your fil
 
 -   VLC
 -   youtube-dl (if you plan on installing music)
+-   jq (if you want to use auto-completion for tags)
+
+## Installation
 
 ## Usage
 

@@ -32,7 +32,11 @@ type Tag struct {
 type Tags map[string]Tag
 
 func GetTagPath(musicPath string) string {
-	return filepath.Join(musicPath, "tags.json")
+	return filepath.Join(musicPath, "playlists", "tags.json")
+}
+
+func GetPlaylistPath(musicPath string, playlistName string) string {
+	return filepath.Join(musicPath, "playlists", playlistName+".m3u")
 }
 
 func GetStoredTags(musicPath string) (Tags, error) {
@@ -98,10 +102,62 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		args.musicPath = defaultMusicPath
 	}
 
+	// create the playlists directory if it doesn't exist
+	_, err := os.Stat(filepath.Join(args.musicPath, "playlists"))
+
+	if errors.Is(err, fs.ErrNotExist) {
+		err = os.Mkdir(filepath.Join(args.musicPath, "playlists"), 0777)
+	} else if err != nil {
+		return err
+	}
+
+	// create the tags.json file if it doesn't exist
+	_, err = os.Stat(GetTagPath(args.musicPath))
+
+	if errors.Is(err, fs.ErrNotExist) {
+		err = os.WriteFile(GetTagPath(args.musicPath), []byte("{}"), 0666)
+	} else if err != nil {
+		return err
+	}
+
 	if len(positional) == 0 {
 		if args.edit {
 			_, err := editor.EditFile(GetTagPath(args.musicPath))
-			return err
+
+			if err != nil {
+				return err
+			}
+
+			storedTags, err := GetStoredTags(args.musicPath)
+
+			if err != nil {
+				return err
+			}
+
+			files, err := os.ReadDir(filepath.Join(args.musicPath, "playlists"))
+
+			if err != nil {
+				return err
+			}
+
+			storedTagsKeys := make([]string, 0, len(storedTags))
+
+			for k := range storedTags {
+				storedTagsKeys = append(storedTagsKeys, k)
+			}
+
+			// remove the files for the deleted playlists
+			for _, file := range files {
+				if strings.HasSuffix(file.Name(), ".m3u") && !arrayUtils.Includes(storedTagsKeys, strings.TrimSuffix(file.Name(), ".m3u")) {
+					// don't exit because of it here because it's not a big deal
+					if err := os.Remove(filepath.Join(args.musicPath, "playlists", file.Name())); err != nil {
+						fmt.Printf("error [%s]: %s\n", file.Name(), err)
+					}
+				}
+
+			}
+
+			return nil
 		}
 
 		storedTags, err := GetStoredTags(args.musicPath)
@@ -175,20 +231,58 @@ func ChangeSongsInTag(musicPath string, tagName string, songs []string, shouldAp
 	}
 
 	tag, ok := storedTags[tagName]
-
 	now := time.Now().Unix()
+	playlistPath := GetPlaylistPath(musicPath, tagName)
+	playlistContent := []string{}
 
 	if !ok {
-		tag = Tag{CreationTime: now, ModifiedTime: now, Songs: arrayUtils.FilterEmptystrings(songs)}
-	} else if !shouldAppend {
-		tag.Songs = arrayUtils.FilterEmptystrings(songs)
-	} else {
+		tag = Tag{CreationTime: now, ModifiedTime: now, Songs: arrayUtils.FilterEmptyStrings(songs)}
+	} else if shouldAppend {
 		for _, song := range songs {
 			if song != "" && !arrayUtils.Includes(tag.Songs, song) {
 				tag.Songs = append(tag.Songs, song)
 			}
 		}
+	} else {
+		tag.Songs = arrayUtils.FilterEmptyStrings(songs)
 	}
+
+	if shouldAppend {
+		_, err := os.Stat(playlistPath)
+
+		if errors.Is(err, fs.ErrNotExist) {
+			playlistContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)}
+		} else if err != nil {
+			return err
+		} else {
+			c, err := os.ReadFile(playlistPath)
+			playlistContent = []string{string(c)}
+
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		playlistContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)}
+	}
+
+	for _, song := range songs {
+		if song != "" {
+			if err != nil {
+				return err
+			}
+
+			relativePath, err := filepath.Rel(filepath.Join(musicPath, "playlists"), song)
+
+			if err != nil {
+				return err
+			}
+
+			playlistContent = append(playlistContent, fmt.Sprintf("%s\n", relativePath))
+		}
+	}
+
+	os.WriteFile(playlistPath, []byte(strings.Join(playlistContent, "")), 0666)
 
 	tag.ModifiedTime = now
 	storedTags[tagName] = tag
