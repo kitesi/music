@@ -19,6 +19,7 @@ import (
 
 type TagsCommandArgs struct {
 	edit         bool
+	check        bool
 	shouldDelete bool
 	musicPath    string
 }
@@ -31,7 +32,7 @@ type Tag struct {
 
 type Tags map[string]Tag
 
-func GetTagPath(musicPath string) string {
+func GetTagJsonPath(musicPath string) string {
 	return filepath.Join(musicPath, "playlists", "tags.json")
 }
 
@@ -42,7 +43,7 @@ func GetPlaylistPath(musicPath string, playlistName string) string {
 func GetStoredTags(musicPath string) (Tags, error) {
 	storedTags := Tags{}
 
-	content, err := os.ReadFile(GetTagPath(musicPath))
+	content, err := os.ReadFile(GetTagJsonPath(musicPath))
 
 	if err == nil {
 		err = json.Unmarshal(content, &storedTags)
@@ -75,10 +76,28 @@ func Setup(rootCmd *cobra.Command) {
 	}
 
 	tagsCmd.Flags().BoolVarP(&args.edit, "editor", "e", false, "edit tags.json or a specific tag with $EDITOR")
+	tagsCmd.Flags().BoolVarP(&args.check, "check", "c", false, "check if the songs exist under the given tags")
 	tagsCmd.Flags().BoolVarP(&args.shouldDelete, "delete", "d", false, "delete a tag")
 	tagsCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "the music path to use")
 
 	rootCmd.AddCommand(tagsCmd)
+}
+
+func updateAPlaylistFile(musicPath string, playlistPath string, songs []string, playlistContent []string) error {
+	for _, song := range songs {
+		if song != "" {
+			relativePath, err := filepath.Rel(filepath.Join(musicPath, "playlists"), song)
+
+			if err != nil {
+				return err
+			}
+
+			playlistContent = append(playlistContent, fmt.Sprintf("%s\n", relativePath))
+		}
+	}
+
+	os.WriteFile(playlistPath, []byte(strings.Join(playlistContent, "")), 0666)
+	return nil
 }
 
 func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
@@ -92,6 +111,10 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		}
 	}
 
+	if args.check && args.edit {
+		return errors.New("can't have --check and --editor together")
+	}
+
 	if args.musicPath == "" {
 		defaultMusicPath, err := stringUtils.GetDefaultMusicPath()
 
@@ -100,6 +123,43 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		}
 
 		args.musicPath = defaultMusicPath
+	}
+
+	if args.check {
+		storedTags, err := GetStoredTags(args.musicPath)
+
+		if err != nil {
+			return err
+		}
+
+		for _, requestedTagName := range positional {
+			tag, ok := storedTags[requestedTagName]
+
+			if !ok {
+				fmt.Fprintf(os.Stderr, "error: tag \"%s\" does not exist\n", requestedTagName)
+				continue
+			}
+
+			allSongsExist := true
+
+			for _, song := range tag.Songs {
+				_, err := os.Stat(song)
+
+				if errors.Is(err, fs.ErrNotExist) {
+					allSongsExist = false
+					fmt.Fprintf(os.Stderr, "error: song \"%s\" does not exist\n", song)
+				} else if err != nil {
+					return err
+				}
+			}
+
+			if allSongsExist {
+				fmt.Printf("all songs in tag \"%s\" exist\n", requestedTagName)
+			}
+
+		}
+
+		return nil
 	}
 
 	// create the playlists directory if it doesn't exist
@@ -112,17 +172,17 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 	}
 
 	// create the tags.json file if it doesn't exist
-	_, err = os.Stat(GetTagPath(args.musicPath))
+	_, err = os.Stat(GetTagJsonPath(args.musicPath))
 
 	if errors.Is(err, fs.ErrNotExist) {
-		err = os.WriteFile(GetTagPath(args.musicPath), []byte("{}"), 0666)
+		err = os.WriteFile(GetTagJsonPath(args.musicPath), []byte("{}"), 0666)
 	} else if err != nil {
 		return err
 	}
 
 	if len(positional) == 0 {
 		if args.edit {
-			_, err := editor.EditFile(GetTagPath(args.musicPath))
+			_, err := editor.EditFile(GetTagJsonPath(args.musicPath))
 
 			if err != nil {
 				return err
@@ -140,17 +200,23 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 				return err
 			}
 
-			storedTagsKeys := make([]string, 0, len(storedTags))
-
-			for k := range storedTags {
-				storedTagsKeys = append(storedTagsKeys, k)
-			}
-
 			// remove the files for the deleted playlists
 			for _, file := range files {
-				if strings.HasSuffix(file.Name(), ".m3u") && !arrayUtils.Includes(storedTagsKeys, strings.TrimSuffix(file.Name(), ".m3u")) {
+				if !strings.HasSuffix(file.Name(), ".m3u") {
+					continue
+				}
+
+				tagName := strings.TrimSuffix(file.Name(), ".m3u")
+
+				if _, ok := storedTags[tagName]; !ok {
 					// don't exit because of it here because it's not a big deal
 					if err := os.Remove(filepath.Join(args.musicPath, "playlists", file.Name())); err != nil {
+						fmt.Printf("error [%s]: %s\n", file.Name(), err)
+					}
+				} else {
+					err = updateAPlaylistFile(args.musicPath, GetPlaylistPath(args.musicPath, tagName), storedTags[tagName].Songs, []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)})
+
+					if err != nil {
 						fmt.Printf("error [%s]: %s\n", file.Name(), err)
 					}
 				}
@@ -205,7 +271,7 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		if args.shouldDelete {
 			delete(storedTags, requestedTagName)
 
-			if err := updateTagsFile(&storedTags, args.musicPath); err != nil {
+			if err := updateTagsJsonFile(&storedTags, args.musicPath); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
 
@@ -266,36 +332,24 @@ func ChangeSongsInTag(musicPath string, tagName string, songs []string, shouldAp
 		playlistContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)}
 	}
 
-	for _, song := range songs {
-		if song != "" {
-			if err != nil {
-				return err
-			}
+	err = updateAPlaylistFile(musicPath, playlistPath, tag.Songs, playlistContent)
 
-			relativePath, err := filepath.Rel(filepath.Join(musicPath, "playlists"), song)
-
-			if err != nil {
-				return err
-			}
-
-			playlistContent = append(playlistContent, fmt.Sprintf("%s\n", relativePath))
-		}
+	if err != nil {
+		return err
 	}
-
-	os.WriteFile(playlistPath, []byte(strings.Join(playlistContent, "")), 0666)
 
 	tag.ModifiedTime = now
 	storedTags[tagName] = tag
 
-	return updateTagsFile(&storedTags, musicPath)
+	return updateTagsJsonFile(&storedTags, musicPath)
 }
 
-func updateTagsFile(tags *Tags, musicPath string) error {
+func updateTagsJsonFile(tags *Tags, musicPath string) error {
 	tagsString, err := json.Marshal(tags)
 
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(GetTagPath(musicPath), tagsString, 0666)
+	return os.WriteFile(GetTagJsonPath(musicPath), tagsString, 0666)
 }
