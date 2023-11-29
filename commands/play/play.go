@@ -80,17 +80,6 @@ func generateCommand() (*cobra.Command, *PlayArgs) {
 	return playCmd, &args
 }
 
-func setDefaultMusicPath(args *PlayArgs) error {
-	defaultMusicPath, err := stringUtils.GetDefaultMusicPath()
-
-	if err != nil {
-		return err
-	}
-
-	args.musicPath = defaultMusicPath
-	return nil
-}
-
 func Setup(rootCmd *cobra.Command) {
 	playCmd, args := generateCommand()
 
@@ -105,12 +94,18 @@ func Setup(rootCmd *cobra.Command) {
 }
 
 func playRunner(args *PlayArgs, terms []string) error {
-	if args.live {
-		return liveQueryResults()
+	if args.musicPath == "" {
+		defaultMusicPath, err := stringUtils.GetDefaultMusicPath()
+
+		if err != nil {
+			return err
+		}
+
+		args.musicPath = defaultMusicPath
 	}
 
-	if err := setDefaultMusicPath(args); err != nil {
-		return err
+	if args.live {
+		return liveQueryResults(args.musicPath)
 	}
 
 	if len(terms) == 0 && args.limit != 0 && !args.dryPaths && !args.playNewFirst && !args.new && !args.edit && len(args.tags) == 0 {
@@ -288,9 +283,8 @@ func runVLC(args *PlayArgs, vlcArgs []string) error {
 		// Detach the terminal
 		_, err = syscall.Setsid()
 
-		if err != nil {
-			return err
-		}
+		// ignore error
+		return nil
 	}
 
 	return err

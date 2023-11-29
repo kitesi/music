@@ -42,8 +42,8 @@ func truncateString(val string, maxLength int) string {
 }
 
 func writeToScreen(query string, songs []string, musicPath string) error {
-	clearScreenDown()
 	fmt.Print("\r")
+	clearScreenDown()
 
 	terminalColumnSize, terminalRowSize, err := term.GetSize(int(os.Stdin.Fd()))
 
@@ -92,7 +92,7 @@ func writeToScreen(query string, songs []string, musicPath string) error {
 	return nil
 }
 
-func liveQueryResults() error {
+func liveQueryResults(musicPath string) error {
 	subPlayCmd, subPlayArgs := generateCommand()
 	subPlayTerms := []string{}
 
@@ -117,6 +117,8 @@ func liveQueryResults() error {
 	lastQuery := ""
 	lastSongs := []string{}
 	query := ""
+	unclosedDoubleQuote := false
+	unclosedSingleQuote := false
 
 	clearScreenUp()
 	moveCursorVerticalAbsolute(0)
@@ -134,9 +136,10 @@ InfiniteLoop:
 
 		key := string(b[0])
 
-		// shlex can't handle a starting quote
-		if key == "\"" || key == "'" {
-			continue
+		if key == "\"" && !unclosedSingleQuote {
+			unclosedDoubleQuote = !unclosedDoubleQuote
+		} else if key == "'" && !unclosedDoubleQuote {
+			unclosedSingleQuote = !unclosedSingleQuote
 		}
 
 		// todo: prob better way
@@ -148,21 +151,31 @@ InfiniteLoop:
 			break InfiniteLoop
 		// backspace
 		case "\x7F":
-			if query != "" {
+			if len(query) != 0 {
 				query = query[:len(query)-1]
 			}
 		// ctrl-u
 		case "\x15":
 			query = ""
+			unclosedDoubleQuote = false
+			unclosedSingleQuote = false
 		// ctrl-w
 		case "\x17":
 			tokens, err := shlex.Split(strings.TrimSpace(query))
 
-			if err != nil || len(tokens) < 1 {
-				break
+			if err != nil || len(tokens) == 0 {
+				continue
+			}
+
+			// account for the possible deletion of a quote
+			if strings.HasPrefix(tokens[len(tokens)-1], "\"") {
+				unclosedDoubleQuote = false
+			} else if strings.HasPrefix(tokens[len(tokens)-1], "'") {
+				unclosedSingleQuote = false
 			}
 
 			query = strings.Join(tokens[0:len(tokens)-1], " ")
+
 		case "\r":
 			fmt.Print("\r")
 			clearScreenDown()
@@ -178,19 +191,30 @@ InfiniteLoop:
 
 			runVLC(subPlayArgs, lastSongs)
 			return nil
-		}
+		default:
+			asciiCode := int(b[0])
 
-		asciiCode := int(b[0])
-
-		if asciiCode < 32 || asciiCode > 126 {
-			if query == lastQuery {
-				continue
+			// todo: do something with the other ascii codes
+			if asciiCode < 32 || asciiCode > 126 {
+				if query == lastQuery {
+					continue InfiniteLoop
+				}
+			} else {
+				query += key
 			}
-		} else {
-			query += key
 		}
 
-		argsFromQuery, err := shlex.Split(query)
+		tempQuery := query
+
+		if unclosedDoubleQuote {
+			tempQuery += "\""
+		}
+
+		if unclosedSingleQuote {
+			tempQuery += "'"
+		}
+
+		argsFromQuery, err := shlex.Split(tempQuery)
 
 		if err != nil {
 			continue
@@ -214,18 +238,16 @@ InfiniteLoop:
 		}
 
 		// live parsing of music-path is just not efficient
-		subPlayArgs.musicPath = ""
-		setDefaultMusicPath(subPlayArgs)
+		subPlayArgs.musicPath = musicPath
+		lastQuery = query
 
 		songs, err := getSongs(subPlayArgs, subPlayTerms)
 
 		if err != nil {
-			lastQuery = query
 			continue
 		}
 
 		lastSongs = songs
-		lastQuery = query
 	}
 
 	return nil
