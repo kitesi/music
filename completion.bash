@@ -42,14 +42,12 @@ _music_install_completions() {
     local cur_word="${COMP_WORDS[COMP_CWORD]}"
     local prev_word="${COMP_WORDS[COMP_CWORD - 1]}"
 
-    local amount_of_args="${#COMP_WORDS[@]}"
-
     case "$prev_word" in 
         install)
-            COMPREPLY=( $(compgen -W "https://www.youtube.com/watch?v=" -- ${cur_word}) )
+            COMPREPLY=( $(compgen -W "https://www.youtube.com/watch?v=" -- "$cur_word") )
             ;;
         --format|-f)
-            COMPREPLY=( $(compgen -W "3gp aac flv m4a mp3 mp4 ogg wav webm" -- ${cur_word}) )
+            COMPREPLY=( $(compgen -W "3gp aac flv m4a mp3 mp4 ogg wav webm" -- "$cur_word") )
             ;;
         --music-path|-m)
             COMPREPLY=()
@@ -58,7 +56,7 @@ _music_install_completions() {
             # depending how up to date you want this to be, you can set this variable outside of
             # this function (global scope). It's still pretty fast for me so I personally won't
             local SONGS_SUB_DIRS=$(basename -a $MUSIC_PATH/*/ | sed 's/ /-/g' | awk '{print tolower($0)}' | tr '\n' ' ')
-            COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}--format --ytdl-args --name --editor --music-path --help" -- ${cur_word}) )
+            COMPREPLY=( $(compgen -W "${SONGS_SUB_DIRS[*]}--format --ytdl-args --name --editor --music-path --help" -- "$cur_word") )
             ;;
     esac
     
@@ -75,12 +73,9 @@ _music_tags_completions() {
     fi
 
     local options="--editor --help --music-path --delete"
+	options+=" $(find $MUSIC_PATH/tags/ -name \*.m3u -exec basename -s '.m3u' {} +)"
 
-    if [ -x "$(which jq)" ]; then
-        options+=" $(jq 'keys[]' <$MUSIC_PATH/tags.json)"
-    fi
-
-    COMPREPLY=( $(compgen -W "$options" -- $cur_word ) )
+    COMPREPLY=( $(compgen -W "$options" -- "$cur_word") )
     return 0
 }
 
@@ -91,21 +86,17 @@ _music_play_completions() {
 
     case "$prev_word" in
         --sort-type|-s)
-            COMPREPLY=( $(compgen -W "a c m" -- $cur_word) ) 
+            COMPREPLY=( $(compgen -W "a c m" -- "$cur_word") ) 
             ;;
         --music-path)
             COMPREPLY=()
             ;; 
         --add-to-tag|--set-to-tag|-a)
-            if [ -x "$(which jq)" ]; then
-                local tags=$(jq 'keys[]' <$MUSIC_PATH/tags.json)
-                COMPREPLY=( $(compgen -W "$tags" -- $cur_word) )
-            else
-                COMPREPLY=( $(compgen -W "$generic_options" -- $cur_word) )
-            fi
+			local tags=$(find $MUSIC_PATH/tags/ -name \*.m3u -exec basename -s '.m3u' {} +)
+			COMPREPLY=( $(compgen -W "$tags" -- "$cur_word") )
             ;;
         *)
-            COMPREPLY=( $(compgen -W "$generic_options" -- $cur_word) )
+            COMPREPLY=( $(compgen -W "$generic_options" -- "$cur_word") )
             ;;
     esac
 

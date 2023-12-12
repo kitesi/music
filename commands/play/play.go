@@ -1,16 +1,16 @@
 package play
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
-	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 
 	"github.com/djherbis/times"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/kitesi/music/commands/tags"
@@ -33,6 +33,7 @@ type PlayArgs struct {
 	appendToPlaylist bool
 	live             bool
 	edit             bool
+	debug            bool
 	tags             []string
 	addToTag         string
 	setToTag         string
@@ -54,6 +55,7 @@ func addFlags(playCmd *cobra.Command, args *PlayArgs) {
 	playCmd.Flags().BoolVar(&args.appendToPlaylist, "append", false, "append to playlist rather than jumping")
 	playCmd.Flags().BoolVar(&args.live, "live", false, "go into live query results mode")
 	playCmd.Flags().BoolVarP(&args.edit, "edit", "e", false, "pipe to $EDITOR for song selection before playing")
+	playCmd.Flags().BoolVar(&args.debug, "debug", false, "enable debug mode")
 
 	playCmd.Flags().StringVarP(&args.addToTag, "add-to-tag", "a", "", "add returned songs to tag")
 	playCmd.Flags().StringVar(&args.setToTag, "set-to-tag", "", "set returned songs to tag")
@@ -85,8 +87,11 @@ func Setup(rootCmd *cobra.Command) {
 
 	playCmd.Run = func(_ *cobra.Command, terms []string) {
 		if err := playRunner(args, terms); err != nil {
-			log.SetFlags(0)
-			log.Fatal(err)
+			if args.debug {
+				fmt.Fprintf(os.Stderr, "error: %+v\n", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "error: %s\n", err)
+			}
 		}
 	}
 

@@ -1,15 +1,15 @@
 package tags
 
 import (
-	"encoding/json"
-	"errors"
+	// "errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	arrayUtils "github.com/kitesi/music/array-utils"
 	"github.com/kitesi/music/editor"
@@ -21,40 +21,51 @@ type TagsCommandArgs struct {
 	edit         bool
 	check        bool
 	shouldDelete bool
+	debug        bool
 	musicPath    string
 }
 
-type Tag struct {
-	Songs        []string `json:"songs"`
-	CreationTime int64    `json:"creation_time"`
-	ModifiedTime int64    `json:"modified_time"`
+func GetTagPath(musicPath string, tagName string) string {
+	return filepath.Join(musicPath, "tags", tagName+".m3u")
 }
 
-type Tags map[string]Tag
+func GetStoredTags(musicPath string) (map[string][]string, error) {
+	storedTags := make(map[string][]string)
+	files, err := os.ReadDir(filepath.Join(musicPath, "tags"))
 
-func GetTagJsonPath(musicPath string) string {
-	return filepath.Join(musicPath, "playlists", "tags.json")
-}
-
-func GetPlaylistPath(musicPath string, playlistName string) string {
-	return filepath.Join(musicPath, "playlists", playlistName+".m3u")
-}
-
-func GetStoredTags(musicPath string) (Tags, error) {
-	storedTags := Tags{}
-
-	content, err := os.ReadFile(GetTagJsonPath(musicPath))
-
-	if err == nil {
-		err = json.Unmarshal(content, &storedTags)
-
-		if err != nil {
-			return nil, err
-		}
-	} else if errors.Is(err, fs.ErrNotExist) {
+	// if the tags directory doesn't exist, return an empty map
+	if err != nil {
 		return storedTags, nil
-	} else {
-		return nil, err
+	}
+
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".m3u") {
+			songs := []string{}
+
+			tagPath := filepath.Join(musicPath, "tags", file.Name())
+			tagContent, err := os.ReadFile(tagPath)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not read tag file \"%s\": %w", tagPath, err)
+			}
+
+			// sort of a naive implementation, and assumes the user won't modify the tag file
+			for _, line := range strings.Split(string(tagContent), "\n") {
+				if strings.HasPrefix(line, "#") || line == "" {
+					continue
+				}
+
+				songPath := filepath.Join(musicPath, "tags", line)
+
+				if filepath.IsAbs(line) {
+					songPath = line
+				}
+
+				songs = append(songs, songPath)
+			}
+
+			storedTags[strings.TrimSuffix(file.Name(), ".m3u")] = songs
+		}
 	}
 
 	return storedTags, nil
@@ -69,57 +80,42 @@ func Setup(rootCmd *cobra.Command) {
 		Long:  "Manage tags. Lists all the tags by default. If a tag is provided, this will list all the songs in that tag.",
 		Run: func(cmd *cobra.Command, positional []string) {
 			if err := tagsCommandRunner(&args, positional); err != nil {
-				log.SetFlags(0)
-				log.Fatal(err)
+				if args.debug {
+					fmt.Fprintf(os.Stderr, "error: %+v\n", err)
+				} else {
+					fmt.Fprintf(os.Stderr, "error: %s\n", err)
+				}
 			}
 		},
 	}
 
-	tagsCmd.Flags().BoolVarP(&args.edit, "editor", "e", false, "edit tags.json or a specific tag with $EDITOR")
+	tagsCmd.Flags().BoolVarP(&args.edit, "edit", "e", false, "edit tags.json or a specific tag with $EDITOR")
 	tagsCmd.Flags().BoolVarP(&args.check, "check", "c", false, "check if the songs exist under the given tags")
 	tagsCmd.Flags().BoolVarP(&args.shouldDelete, "delete", "d", false, "delete a tag")
+	tagsCmd.Flags().BoolVar(&args.debug, "debug", false, "enable debug mode")
 	tagsCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "the music path to use")
 
 	rootCmd.AddCommand(tagsCmd)
 }
 
-func updateAPlaylistFile(musicPath string, playlistPath string, songs []string, playlistContent []string) error {
-	for _, song := range songs {
-		if song != "" {
-			relativePath, err := filepath.Rel(filepath.Join(musicPath, "playlists"), song)
-
-			if err != nil {
-				return err
-			}
-
-			playlistContent = append(playlistContent, fmt.Sprintf("%s\n", relativePath))
-		}
-	}
-
-	os.WriteFile(playlistPath, []byte(strings.Join(playlistContent, "")), 0666)
-	return nil
-}
-
 func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
-	if args.shouldDelete {
-		if args.edit {
-			return errors.New("can't have --delete and --editor together")
-		}
-
-		if len(positional) == 0 {
-			return errors.New("can't use --delete without a tag")
-		}
-	}
-
-	if args.check && args.edit {
-		return errors.New("can't have --check and --editor together")
+	if len(positional) == 0 && args.edit {
+		return errors.New("can't use --edit without a tag")
+	} else if len(positional) == 0 && args.shouldDelete {
+		return errors.New("can't use --delete without a tag")
+	} else if args.edit && args.shouldDelete {
+		return errors.New("can't use --delete with --edit")
+	} else if args.check && args.edit {
+		return errors.New("can't use --edit with --check")
+	} else if args.check && args.shouldDelete {
+		return errors.New("can't use --delete with --check")
 	}
 
 	if args.musicPath == "" {
 		defaultMusicPath, err := stringUtils.GetDefaultMusicPath()
 
 		if err != nil {
-			return err
+			return fmt.Errorf("could not getting default music path: %w", err)
 		}
 
 		args.musicPath = defaultMusicPath
@@ -129,7 +125,7 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		storedTags, err := GetStoredTags(args.musicPath)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("could not get stored tags: %w", err)
 		}
 
 		for _, requestedTagName := range positional {
@@ -142,7 +138,7 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 
 			allSongsExist := true
 
-			for _, song := range tag.Songs {
+			for _, song := range tag {
 				_, err := os.Stat(song)
 
 				if errors.Is(err, fs.ErrNotExist) {
@@ -162,74 +158,11 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		return nil
 	}
 
-	// create the playlists directory if it doesn't exist
-	_, err := os.Stat(filepath.Join(args.musicPath, "playlists"))
-
-	if errors.Is(err, fs.ErrNotExist) {
-		err = os.Mkdir(filepath.Join(args.musicPath, "playlists"), 0777)
-	} else if err != nil {
-		return err
-	}
-
-	// create the tags.json file if it doesn't exist
-	_, err = os.Stat(GetTagJsonPath(args.musicPath))
-
-	if errors.Is(err, fs.ErrNotExist) {
-		err = os.WriteFile(GetTagJsonPath(args.musicPath), []byte("{}"), 0666)
-	} else if err != nil {
-		return err
-	}
-
 	if len(positional) == 0 {
-		if args.edit {
-			_, err := editor.EditFile(GetTagJsonPath(args.musicPath))
-
-			if err != nil {
-				return err
-			}
-
-			storedTags, err := GetStoredTags(args.musicPath)
-
-			if err != nil {
-				return err
-			}
-
-			files, err := os.ReadDir(filepath.Join(args.musicPath, "playlists"))
-
-			if err != nil {
-				return err
-			}
-
-			// remove the files for the deleted playlists
-			for _, file := range files {
-				if !strings.HasSuffix(file.Name(), ".m3u") {
-					continue
-				}
-
-				tagName := strings.TrimSuffix(file.Name(), ".m3u")
-
-				if _, ok := storedTags[tagName]; !ok {
-					// don't exit because of it here because it's not a big deal
-					if err := os.Remove(filepath.Join(args.musicPath, "playlists", file.Name())); err != nil {
-						fmt.Printf("error [%s]: %s\n", file.Name(), err)
-					}
-				} else {
-					err = updateAPlaylistFile(args.musicPath, GetPlaylistPath(args.musicPath, tagName), storedTags[tagName].Songs, []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)})
-
-					if err != nil {
-						fmt.Printf("error [%s]: %s\n", file.Name(), err)
-					}
-				}
-
-			}
-
-			return nil
-		}
-
 		storedTags, err := GetStoredTags(args.musicPath)
 
 		if err != nil {
-			return err
+			return fmt.Errorf("could not get stored tags: %w", err)
 		}
 
 		for k := range storedTags {
@@ -239,49 +172,56 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		return nil
 	}
 
+	_, err := os.Stat(filepath.Join(args.musicPath, "tags"))
+
+	// create the tags directory if it doesn't exist
+	if errors.Is(err, fs.ErrNotExist) {
+		if args.shouldDelete {
+			return errors.New("there are no tags to delete")
+		}
+
+		err = os.Mkdir(filepath.Join(args.musicPath, "tags"), 0777)
+	} else if err != nil {
+		return fmt.Errorf("could not get tags directory: %w", err)
+	}
+
 	storedTags, err := GetStoredTags(args.musicPath)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("could not get stored tags: %w", err)
 	}
 
 	for _, requestedTagName := range positional {
 		tag, ok := storedTags[requestedTagName]
 
 		if args.edit {
-			content, err := editor.CreateAndModifyTemp("", requestedTagName+"-*.txt", strings.Join(tag.Songs, "\n"))
+			tagPath := GetTagPath(args.musicPath, requestedTagName)
+			err := os.WriteFile(tagPath, []byte("#EXTM3U\n#PLAYLIST:"+requestedTagName+"\n"), 0666)
+
+			if err != nil {
+				return fmt.Errorf("could not write tag file: %w", err)
+			}
+
+			_, err = editor.EditFile(tagPath)
 
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				continue
 			}
-
-			if err = ChangeSongsInTag(args.musicPath, requestedTagName, strings.Split(content, "\n"), false); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-			}
-
-			continue
-		}
-
-		if !ok {
-			fmt.Fprintf(os.Stderr, "Error: tag \"%s\" does not exist\n", requestedTagName)
-			continue
-		}
-
-		if args.shouldDelete {
+		} else if !ok {
+			fmt.Fprintf(os.Stderr, "error: tag \"%s\" does not exist\n", requestedTagName)
+		} else if args.shouldDelete {
 			delete(storedTags, requestedTagName)
 
-			if err := updateTagsJsonFile(&storedTags, args.musicPath); err != nil {
+			if err := os.Remove(GetTagPath(args.musicPath, requestedTagName)); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
-
-			continue
+		} else {
+			fmt.Printf("Name: %s, Amount: %d\n", requestedTagName, len(tag))
+			fmt.Println(strings.Join(tag, "\n"))
 		}
-
-		fmt.Printf("Name: %s, Amount: %d, Creation: %s, Modified: %s\n", requestedTagName, len(tag.Songs), formatTime(tag.ModifiedTime), formatTime(tag.CreationTime))
-		fmt.Println(strings.Join(tag.Songs, "\n"))
-
 	}
+
 	return nil
 }
 
@@ -293,63 +233,64 @@ func ChangeSongsInTag(musicPath string, tagName string, songs []string, shouldAp
 	storedTags, err := GetStoredTags(musicPath)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("could not get stored tags: %w", err)
 	}
 
-	tag, ok := storedTags[tagName]
-	now := time.Now().Unix()
-	playlistPath := GetPlaylistPath(musicPath, tagName)
-	playlistContent := []string{}
+	tagPath := GetTagPath(musicPath, tagName)
+	tagContent := []string{}
+	tagSongs, ok := storedTags[tagName]
 
 	if !ok {
-		tag = Tag{CreationTime: now, ModifiedTime: now, Songs: arrayUtils.FilterEmptyStrings(songs)}
+		tagSongs = []string{}
 	} else if shouldAppend {
 		for _, song := range songs {
-			if song != "" && !arrayUtils.Includes(tag.Songs, song) {
-				tag.Songs = append(tag.Songs, song)
+			if song != "" && !arrayUtils.Includes(tagSongs, song) {
+				tagSongs = append(tagSongs, song)
 			}
 		}
 	} else {
-		tag.Songs = arrayUtils.FilterEmptyStrings(songs)
+		tagSongs = arrayUtils.FilterEmptyStrings(songs)
 	}
 
 	if shouldAppend {
-		_, err := os.Stat(playlistPath)
+		_, err := os.Stat(tagPath)
 
 		if errors.Is(err, fs.ErrNotExist) {
-			playlistContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)}
+			tagContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)}
 		} else if err != nil {
-			return err
+			return fmt.Errorf("could not get tag file: %w", err)
 		} else {
-			c, err := os.ReadFile(playlistPath)
-			playlistContent = []string{string(c)}
+			c, err := os.ReadFile(tagPath)
 
 			if err != nil {
-				return err
+				return fmt.Errorf("could not read tag file: %w", err)
 			}
+
+			tagContent = []string{string(c)}
 		}
 	} else {
-		playlistContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)}
+		tagContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)}
 	}
 
-	err = updateAPlaylistFile(musicPath, playlistPath, tag.Songs, playlistContent)
+	for _, song := range tagSongs {
+		if song != "" {
+			relativePath, err := filepath.Rel(filepath.Join(musicPath, "tags"), song)
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: could not get relative path for \"%s\": %s\n", song, err)
+				continue
+			}
+
+			tagContent = append(tagContent, fmt.Sprintf("%s\n", relativePath))
+		}
+	}
+
+	err = os.WriteFile(tagPath, []byte(strings.Join(tagContent, "")), 0666)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("could not write tag file: %w", err)
 	}
 
-	tag.ModifiedTime = now
-	storedTags[tagName] = tag
-
-	return updateTagsJsonFile(&storedTags, musicPath)
-}
-
-func updateTagsJsonFile(tags *Tags, musicPath string) error {
-	tagsString, err := json.Marshal(tags)
-
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(GetTagJsonPath(musicPath), tagsString, 0666)
+	storedTags[tagName] = tagSongs
+	return nil
 }

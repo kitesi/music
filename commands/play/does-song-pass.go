@@ -4,10 +4,9 @@ import (
 	"strings"
 
 	arrayUtils "github.com/kitesi/music/array-utils"
-	"github.com/kitesi/music/commands/tags"
 )
 
-func doesSongPass(args *PlayArgs, savedTags tags.Tags, terms []string, songPath string) bool {
+func doesSongPass(args *PlayArgs, savedTags map[string][]string, terms []string, songPath string) bool {
 	if len(terms) == 0 && len(args.tags) == 0 {
 		return true
 	}
@@ -27,7 +26,7 @@ func doesSongPass(args *PlayArgs, savedTags tags.Tags, terms []string, songPath 
 		}
 
 		for k, v := range savedTags {
-			if strings.Contains(k, tag) && arrayUtils.Some(v.Songs, isSong) {
+			if strings.Contains(k, tag) && arrayUtils.Some(v, isSong) {
 				return true
 			}
 		}
