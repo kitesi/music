@@ -228,10 +228,20 @@ func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 	}
 
 	if args.skip > 0 {
+		if args.skip > len(songs) {
+			return []string{}, nil
+		}
+
 		songs = songs[args.skip:]
+
+		if args.limit > 0 {
+			args.limit -= args.skip
+		}
 	}
 
 	if args.limit > 0 && len(songs) > args.limit {
+		fmt.Println(args.limit)
+
 		songs = songs[:args.limit]
 	}
 
