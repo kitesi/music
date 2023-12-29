@@ -1,13 +1,3 @@
 #!/bin/sh
 
-TEMP_SONGS_DIR="/storage/emulated/0/Temp-Music/"
-
-[ -d "$TEMP_SONGS_DIR" ] && rm -rf $TEMP_SONGS_DIR
-
-mkdir "$TEMP_SONGS_DIR"
-
-music play $@ -d
-
-music play $@ -p | while read line ; do
-    cp "$line" "/storage/emulated/0/Temp-Music"
-done
+music play $@ -d --set-to-tag query

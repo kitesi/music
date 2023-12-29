@@ -195,6 +195,11 @@ func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 			return nil
 		}
 
+		// ignore the playlists, tags and .thumbnails directories
+		if strings.Contains(fileName, "/playlists") || strings.Contains(fileName, "/tags") || strings.Contains(fileName, "/.thumbnails") {
+			return nil
+		}
+
 		if doesSongPass(args, storedTags, terms, strings.ToLower(fileName)) {
 			stat, err := times.Stat(fileName)
 

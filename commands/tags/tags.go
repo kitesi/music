@@ -240,16 +240,14 @@ func ChangeSongsInTag(musicPath string, tagName string, songs []string, shouldAp
 	tagContent := []string{}
 	tagSongs, ok := storedTags[tagName]
 
-	if !ok {
-		tagSongs = []string{}
-	} else if shouldAppend {
+	if !ok || !shouldAppend {
+		tagSongs = arrayUtils.FilterEmptyStrings(songs)
+	} else {
 		for _, song := range songs {
 			if song != "" && !arrayUtils.Includes(tagSongs, song) {
 				tagSongs = append(tagSongs, song)
 			}
 		}
-	} else {
-		tagSongs = arrayUtils.FilterEmptyStrings(songs)
 	}
 
 	if shouldAppend {
