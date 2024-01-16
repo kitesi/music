@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/kitesi/music/commands/lastfm"
 	"github.com/kitesi/music/commands/play"
 	"github.com/kitesi/music/commands/tags"
 
@@ -13,8 +14,9 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
-	play.Setup(rootCmd)
-	tags.Setup(rootCmd)
+	rootCmd.AddCommand(play.Setup())
+	rootCmd.AddCommand(tags.Setup())
+	rootCmd.AddCommand(lastfm.Setup())
 
 	rootCmd.AddGroup(&cobra.Group{
 		ID:    "generic",

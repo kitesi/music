@@ -82,7 +82,7 @@ func generateCommand() (*cobra.Command, *PlayArgs) {
 	return playCmd, &args
 }
 
-func Setup(rootCmd *cobra.Command) {
+func Setup() *cobra.Command {
 	playCmd, args := generateCommand()
 
 	playCmd.Run = func(_ *cobra.Command, terms []string) {
@@ -95,7 +95,7 @@ func Setup(rootCmd *cobra.Command) {
 		}
 	}
 
-	rootCmd.AddCommand(playCmd)
+	return playCmd
 }
 
 func playRunner(args *PlayArgs, terms []string) error {
@@ -289,9 +289,19 @@ func runVLC(args *PlayArgs, vlcArgs []string) error {
 	var err error
 
 	if args.persist {
-		err = exec.Command("vlc", vlcArgs...).Run()
+		cmd := exec.Command(args.vlcPath, vlcArgs...)
+
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err != nil {
+			return err
+		}
+
+		err = cmd.Run()
 	} else {
-		cmd := exec.Command("vlc", vlcArgs...)
+		cmd := exec.Command(args.vlcPath, vlcArgs...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 		err := cmd.Start()

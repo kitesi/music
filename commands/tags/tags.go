@@ -71,7 +71,7 @@ func GetStoredTags(musicPath string) (map[string][]string, error) {
 	return storedTags, nil
 }
 
-func Setup(rootCmd *cobra.Command) {
+func Setup() *cobra.Command {
 	args := TagsCommandArgs{}
 
 	tagsCmd := &cobra.Command{
@@ -95,7 +95,7 @@ func Setup(rootCmd *cobra.Command) {
 	tagsCmd.Flags().BoolVar(&args.debug, "debug", false, "enable debug mode")
 	tagsCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "the music path to use")
 
-	rootCmd.AddCommand(tagsCmd)
+	return tagsCmd
 }
 
 func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
