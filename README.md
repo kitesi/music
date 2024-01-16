@@ -1,22 +1,32 @@
 # Music CLI
 
 -   [About](#about)
--   [Installation](#installation)
 -   [Requirements](#requirements)
+-   [Installation](#installation)
 -   [Usage](#usage)
-    -   [Playing Music](#playing-music)
+    -   [Querying & Playing Music](#querying---playing-music)
+    -   [Live Results](#live-results)
     -   [Tags](#tags)
     -   [Installing music](#installing-music)
     -   [Auto Completion](#auto-completion)
+    -   [Lastfm Scrobbling](#lastfm-scrobbling)
+    -   [Android](#android)
+    -   [Configuration](#configuration)
 
 ## About
 
-This is a simple command line tool to help with music-related tasks.
-The primary usage is the querying it provides which allows you to quickly
-select the songs you want to play. This is **not** a music player, it does
-not provide a TUI or GUI, and it uses VLC internally.
+This is a simple command line tool to help with music-related tasks. This is
+**not** a music player. It does not provide a TUI or GUI, and it uses VLC
+internally. I am usually a fan of command line tools, and there are some
+available for music, such as ncmpcpp or cmus, but they do not meet my needs.
+I like to start up my music as quickly and precisely as possible, and I have
+created a querying system to do so. Unfortunately ncmpcpp and cmus do not
+allow you to preload music before you open the program. Here are the main features:
 
-For playlists and grouping of songs, it has a tag system. The tags and data are stored in your `$MUSIC_PATH/tags`.
+1. Querying music quickly and playing it (on vlc)
+2. Setting up a watch server to watch for playing music, and scrobbling it to [lastfm](https://www.last.fm/)
+3. Tagging system for playlists and grouping of songs (stored in `$MUSIC_PATH/tags`)
+4. Installing music (although very limited)
 
 This program does not support piracy; you should have the rights to all your files.
 
@@ -24,9 +34,15 @@ This program does not support piracy; you should have the rights to all your fil
 
 -   VLC
 -   youtube-dl (if you plan on installing music)
--   jq (if you want to use auto-completion for tags)
+-   playerctl (if you plan on scrobbling to lastfm)
 
 ## Installation
+
+Install either from the release page or with go:
+
+```
+go install github.com/kitesi/music@latest
+```
 
 ## Usage
 
@@ -42,9 +58,11 @@ recommend a folder structure of:
         z.mp3
 ```
 
-But this is not a necessary, as any file in your music path will be considered. Files should follow some basic file naming rules: no new lines, no crazy characters, etc.
+But this is not necessary, as any file in your music path will be considered.
+Files should follow some basic file naming rules: no new lines, no crazy
+characters, etc.
 
-### Playing Music
+### Querying & Playing Music
 
 You can play music with the `play` command which will take in
 any amount of positional arguments, these are called terms.
@@ -72,17 +90,29 @@ There are four terms here:
 -   `monday#mornings` (song has to have both words "monday" and "mornings" (not necessarily next to each other))
 -   `care,bear,say` (song has to have one or more of "care", "bear", "say")
 -   `make#you,me#believe` (song has to have "make", either "you" or "me", and "believe")
--   `\!joe` (the song can't have the term )
+-   `\!joe` (the song can't have the term, notice the escaping of "!")
 
-To match the fourth term, a song needs to have "make", either "you" or "me", and "believe" in its path.
+When combining these terms, the string is split by `#` first, and then `,`.
 
-To match the fifth term, a song simply needs to not have the word "joe" in its path. The backlash is there because `!` is a special character in bash.
+#### Live Results
 
-When combining these, the string is split by `#` first, and then `,`.
+You can use `music play --live` to get a live query search of your songs.
+I personally bind this command to a keybinding of `Ctrl+Alt+m`. I also have an
+i3 keybinding to `Meta+m+x` so that it spawns a terminal with just the program.
+
+```
+bindsym $mod+m mode "music"
+
+mode "music" {
+    bindsym x exec alacritty --class floating -o window.padding.x=10 -o window.padding.y=10 -e music play --live; mode "default"
+    # ...
+}
+```
 
 ### Tags
 
-Tags are a way to group music. You can use it for playlists, genres or whatever. Tags will be stored in `$MUSIC_PATH/tags/` as a m3u file.
+Tags are a way to group music. You can use it for playlists, genres or
+whatever. Tags will be stored in `$MUSIC_PATH/tags/` as a m3u file.
 
 You can view your tags with `music tags`. If you want to see the songs in a tag
 use `music tags <tag>`.
@@ -90,7 +120,8 @@ use `music tags <tag>`.
 If you want to delete a tag use `--delete` or `-d` or edit with `--edit` or `-e`.
 
 The intended way to add songs to a tag is to query the songs with `music play`
-and then using `--add-to-tag | -a <tag>` or `--set-to-tag | -s <tag>`.
+and then using `--add-to-tag | -a <tag>` or `--set-to-tag | -s <tag>`. If you
+need to query but don't want to actually play the songs you can add `--dry-run`.
 
 ### Installing music
 
@@ -102,20 +133,6 @@ name can be pretty loose in comparison to the real name. It's case-insensitive
 and replaces spaces with dashes (-).
 
 For example, if you had a folder named "Kite Hughes", you would use "kite-hughes".
-
-### Other Cool Features
-
-You can use `music play --live` to get a live query search of your songs.
-I personally bind this command to a keybinding of `Ctrl+Alt+m`. I also have an i3 keybinding to `Meta+m+x` so that it spawns a terminal with just the program.
-
-```
-bindsym $mod+m mode "music"
-
-mode "music" {
-    bindsym x exec alacritty --class floating -o window.padding.x=10 -o window.padding.y=10 -e music play --live; mode "default"
-    # ...
-}
-```
 
 ### Auto Completion
 
@@ -129,9 +146,56 @@ The cobra provided completion is also a bit more descriptive than I personally
 like, which is why I use my own personal bash completion. It can be found in
 `./completion.bash`
 
-Note: I have `m` as an alias for `music` and `mx` as an alias for `music play`
+-   Note: I have `m` as an alias for `music` and `mx` as an alias for `music play`
+-   Note: It's also more static/hard-coded, so a bit more error-prone/inaccurate.
 
-Note: It's also more static/hard-coded, so a bit more error-prone/inaccurate.
+### Lastfm Scrobbling
+
+While VLC does have built in lastfm scrobbling, I could not get it to work.
+You can run a watch server to watch for playing songs every x seconds (defaulted to 10).
+It uses playerctl under the hood, so you will need to have that installed. It also only
+checks for the VLC player so other media players or something like youtube will
+not be logged.
+
+Currently, the scrobble detection is kinda poor. It follows the approach of minimizing false positives, so if you skip/seek around, it likely won't scrobble. Also, if you play the same song over and over it won't scrobble more than once (although this will be fixed in the future).
+
+Lastly, it follows the [lastfm standards](https://www.last.fm/api/scrobbling):
+
+1.  The track must be longer than 30 seconds.
+2.  The track has been played for at least half its duration, or for 4 minutes (whichever occurs earlier.)
+
+How to call:
+
+```
+music lastfm --interval 20 --debug
+```
+
+I personally have this command start on startup, and redirect the output to `/tmp/music-lastfm.log`.
+
+### Android
+
+If you would like to use the one of main functionalities of querying on android,
+you can do so using termux. You will likely have to install go first and then
+follow the instructions in #installation.
+
+After you have the music command installed, you want to download the wrapper script
+in `./android-termux-mx`. This script calls the play command with the given query
+in a dry run so that no program is called. It then sets the results to a new tag (query.m3u).
+
+You should copy the file to a directory in your termux's `$PATH`:
+
+```bash
+# assuming your $PATH is just one folder (like default)
+curl https://raw.githubusercontent.com/kitesi/music/main/android-termux-mx > $PATH/mx
+```
+
+Once you have the script mx, you can now run it like you would `music play`:
+`mx jaxson#tonight`. Now you can open up vlc and see that in your playlists tab
+there should be a playlist called "query."
+
+You are able to install vlc/cvlc/nvlc on termux, but I would not suggest doing
+so because termux will be hanging and you won't have vlc in your notification
+tray.
 
 ### Configuration
 

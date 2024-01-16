@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 MUSIC_PATH=~/Music
 
 _music_completions()
@@ -9,7 +10,7 @@ _music_completions()
 
     for i in "${COMP_WORDS[@]}"
     do
-        if [ "$i" = "install" ] || [ "$i" = "play" ] || [ "$i" = "tags" ]; then
+        if [ "$i" = "install" ] || [ "$i" = "play" ] || [ "$i" = "tags" ] || [ "$i" = "lastfm" ]; then
             subcommand="$i"
             break
         fi
@@ -30,8 +31,11 @@ _music_completions()
         tags)
             _music_tags_completions
             ;;
+        lastfm)
+            COMPREPLY=( $(compgen -W "--help --debug --interval" -- ${cur_word}) )
+            ;;
         *)
-            COMPREPLY=( $(compgen -W "help completion play tags install --help --version" -- ${cur_word}) )
+            COMPREPLY=( $(compgen -W "help completion play tags install lastfm --help --version" -- ${cur_word}) )
             ;;
     esac
 
@@ -73,7 +77,8 @@ _music_tags_completions() {
     fi
 
     local options="--editor --help --music-path --delete"
-	options+=" $(find $MUSIC_PATH/tags/ -name \*.m3u -exec basename -s '.m3u' {} +)"
+
+    options+=" $(find "$MUSIC_PATH" -type f -name '*.m3u' -exec basename {} .m3u \;)"
 
     COMPREPLY=( $(compgen -W "$options" -- "$cur_word") )
     return 0
@@ -92,8 +97,12 @@ _music_play_completions() {
             COMPREPLY=()
             ;; 
         --add-to-tag|--set-to-tag|-a)
-			local tags=$(find $MUSIC_PATH/tags/ -name \*.m3u -exec basename -s '.m3u' {} +)
-			COMPREPLY=( $(compgen -W "$tags" -- "$cur_word") )
+            if [ -x "$(which jq)" ]; then
+                local tags=$(jq 'keys[]' <$MUSIC_PATH/tags.json)
+                COMPREPLY=( $(compgen -W "$tags" -- "$cur_word") )
+            else
+                COMPREPLY=( $(compgen -W "$generic_options" -- "$cur_word") )
+            fi
             ;;
         *)
             COMPREPLY=( $(compgen -W "$generic_options" -- "$cur_word") )

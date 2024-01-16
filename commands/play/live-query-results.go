@@ -144,8 +144,8 @@ InfiniteLoop:
 
 		// todo: prob better way
 		switch string(key) {
-		// ctrl-c
-		case "\x03":
+		// ctrl-c, ctrl-[ (escape)
+		case "\x03", "\x1B":
 			fmt.Print("\r")
 			clearScreenDown()
 			break InfiniteLoop

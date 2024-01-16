@@ -390,8 +390,6 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 		if artist != currentArtist || track != currentTrack {
 			if currentTrack != "" {
 				paddedLastPosition := currentTrackLastPosition + DEFAULT_INTERVAL_SECONDS - position
-				errorSecondsMargin := 10.0
-
 				timeConditionPassed := -1.0
 
 				if paddedLastPosition > length/2.0 {
@@ -400,9 +398,13 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 					timeConditionPassed = MIN_LISTEN_TIME
 				}
 
+				realTimePassed := float64(time.Now().Unix()-currentTrackFirstTimestamp) / time.Second.Seconds()
+				listenStats := fmt.Sprintf("listened for %.2f, real: %.2f half len: %.2f, min: %d", paddedLastPosition, realTimePassed, length/2.0, MIN_LISTEN_TIME)
+				realTimeErrorMargin := 10.0
+
 				if timeConditionPassed == -1.0 {
-					stdOut.Printf("not scrobbling %s - %s because it did not pass either listen condition", currentArtist, currentTrack)
-				} else if float64(time.Now().Unix()-currentTrackFirstTimestamp)/time.Second.Seconds() > timeConditionPassed-errorSecondsMargin {
+					stdOut.Printf("not scrobbling %s - %s because it did not pass either listen condition (%s)", currentArtist, currentTrack, listenStats)
+				} else if realTimePassed > timeConditionPassed-realTimeErrorMargin {
 					reason := ""
 
 					if paddedLastPosition > length/2.0 {
@@ -411,20 +413,20 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 						reason = "it has been listened to for over the minimum listen time"
 					}
 
-					stdOut.Printf("scrobbling %s - %s because %s", currentArtist, currentTrack, reason)
+					stdOut.Printf("scrobbling %s - %s because %s (%s)", currentArtist, currentTrack, reason, listenStats)
 
 					scrobbleResponse, err := scrobble(credentials, currentArtist, currentTrack, currentTrackFirstTimestamp)
 
 					if err != nil {
-						stdErr.Printf("last.fm api error - %s\n", err.Error())
+						stdErr.Printf("last.fm api error - %s", err.Error())
 					}
 
 					if scrobbleResponse.Scrobbles.Attr.Ignored == 1 {
-						stdErr.Printf("last.fm ignored this scrobble - %s\n", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
+						stdErr.Printf("last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
 					}
 
 				} else {
-					stdOut.Printf("not scrobbling %s - %s because while it did pass the time condition, the real time did not pass\n", currentArtist, currentTrack)
+					stdOut.Printf("not scrobbling %s - %s because while it did pass the time condition, the real time did not pass (%s)", currentArtist, currentTrack, listenStats)
 				}
 			}
 
