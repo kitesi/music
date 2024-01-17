@@ -3,6 +3,7 @@ package lastfm
 import (
 	"bufio"
 	"crypto/md5"
+	"syscall"
 
 	"encoding/hex"
 	"encoding/json"
@@ -14,8 +15,8 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -185,21 +186,9 @@ func scrobble(credentials Credentials, artist string, track string, timestamp in
 	return resultJson, nil
 }
 
-// open opens the specified URL in the default browser of the user.
-// https://stackoverflow.com/a/39324149/
+// playerctl is only on linux so we can just use xdg-open
 func open(url string) error {
-	var cmd *exec.Cmd
-
-	switch runtime.GOOS {
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	default: // "linux", "freebsd", "openbsd", "netbsd"
-		cmd = exec.Command("xdg-open", url)
-	}
-
-	return cmd.Run()
+	return exec.Command("xdg-open", url).Run()
 }
 
 func setupOrGetCredentials() (Credentials, error) {
@@ -315,6 +304,7 @@ func setupOrGetCredentials() (Credentials, error) {
 func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdErr *log.Logger) {
 	currentTrack := ""
 	currentArtist := ""
+	currentTrackLength := 0.0
 	currentTrackLastPosition := 0.0
 	waitTime := time.Duration(delay) * time.Second
 	var currentTrackFirstTimestamp int64
@@ -370,63 +360,49 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 			continue
 		}
 
-		length, err := strconv.ParseFloat(metadata["vlc:time"], 64)
-
-		if err != nil {
-			stdErr.Println("playerctl - could not parse length")
-			time.Sleep(waitTime)
-			continue
-		}
-
 		artist := metadata["xesam:artist"]
 		track := metadata["xesam:title"]
 
-		if length < MIN_TRACK_LEN {
-			stdOut.Printf("skipping track (%s - %s) because it is too short\n", artist, track)
-			time.Sleep(waitTime)
-			continue
-		}
-
 		if artist != currentArtist || track != currentTrack {
-			if currentTrack != "" {
+			if currentTrack != "" && currentTrackLength != -1.0 {
 				paddedLastPosition := currentTrackLastPosition + DEFAULT_INTERVAL_SECONDS - position
 				timeConditionPassed := -1.0
 
-				if paddedLastPosition > length/2.0 {
-					timeConditionPassed = length / 2.0
+				if paddedLastPosition > currentTrackLength/2.0 {
+					timeConditionPassed = currentTrackLength / 2.0
 				} else if paddedLastPosition > MIN_LISTEN_TIME {
 					timeConditionPassed = MIN_LISTEN_TIME
 				}
 
 				realTimePassed := float64(time.Now().Unix()-currentTrackFirstTimestamp) / time.Second.Seconds()
-				listenStats := fmt.Sprintf("listened for %.2f, real: %.2f half len: %.2f, min: %d", paddedLastPosition, realTimePassed, length/2.0, MIN_LISTEN_TIME)
+				listenStats := fmt.Sprintf("listened for %.2f, real: %.2f, half len: %.2f, min: %d", paddedLastPosition, realTimePassed, currentTrackLength/2.0, MIN_LISTEN_TIME)
 				realTimeErrorMargin := 10.0
 
 				if timeConditionPassed == -1.0 {
-					stdOut.Printf("not scrobbling %s - %s because it did not pass either listen condition (%s)", currentArtist, currentTrack, listenStats)
+					stdOut.Printf("└── not scrobbling because it did not pass either listen condition (%s)", listenStats)
 				} else if realTimePassed > timeConditionPassed-realTimeErrorMargin {
 					reason := ""
 
-					if paddedLastPosition > length/2.0 {
+					if paddedLastPosition > currentTrackLength/2.0 {
 						reason = "it is over half way through"
 					} else {
 						reason = "it has been listened to for over the minimum listen time"
 					}
 
-					stdOut.Printf("scrobbling %s - %s because %s (%s)", currentArtist, currentTrack, reason, listenStats)
+					stdOut.Printf("└── scrobbling because %s (%s)", reason, listenStats)
 
 					scrobbleResponse, err := scrobble(credentials, currentArtist, currentTrack, currentTrackFirstTimestamp)
 
 					if err != nil {
-						stdErr.Printf("last.fm api error - %s", err.Error())
+						stdErr.Printf("└── last.fm api error - %s", err.Error())
 					}
 
 					if scrobbleResponse.Scrobbles.Attr.Ignored == 1 {
-						stdErr.Printf("last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
+						stdErr.Printf("└── last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
 					}
 
 				} else {
-					stdOut.Printf("not scrobbling %s - %s because while it did pass the time condition, the real time did not pass (%s)", currentArtist, currentTrack, listenStats)
+					stdOut.Printf("└── not scrobbling because while it did pass the time condition, the real time did not pass (%s)", listenStats)
 				}
 			}
 
@@ -436,6 +412,17 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 			currentTrackFirstTimestamp = time.Now().Unix()
 
 			stdOut.Printf("new song detected - %s - %s\n", artist, track)
+			length, err := strconv.ParseFloat(metadata["vlc:time"], 64)
+
+			if err != nil {
+				stdErr.Printf("└── playerctl - could not parse length of")
+				currentTrackLength = -1.0
+			} else if length < MIN_TRACK_LEN {
+				stdOut.Printf("└── skipping track because it is too short")
+				currentTrackLength = -1.0
+			} else {
+				currentTrackLength = length
+			}
 		} else {
 			currentTrackLastPosition = position
 		}
@@ -445,16 +432,40 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 }
 
 func lastfmRunner(args *LastfmArgs) error {
+	_, err := exec.LookPath("playerctl")
+
+	if err != nil {
+		return errors.New("playerctl is not installed, this program only works on linux")
+	}
+
+	gracefulExit := make(chan os.Signal, 1)
+	signal.Notify(gracefulExit, syscall.SIGINT, syscall.SIGTERM)
+
+	lockFileName := path.Join(os.TempDir(), "music-lastfm.lock")
+	fmt.Println(lockFileName)
+	_, err = os.Stat(lockFileName)
+
+	if err == nil {
+		return fmt.Errorf("server is already running - if it is not, delete %s and try again", lockFileName)
+	}
+
+	lockFile, err := os.Create(lockFileName)
+
+	if err != nil {
+		return errors.New("could not create lock file")
+	}
+
+	go func() {
+		<-gracefulExit
+		lockFile.Close()
+		os.Remove(lockFileName)
+		os.Exit(0)
+	}()
+
 	credentials, err := setupOrGetCredentials()
 
 	if err != nil {
 		return err
-	}
-
-	_, err = exec.LookPath("playerctl")
-
-	if err != nil {
-		return errors.New("playerctl is not installed")
 	}
 
 	stdOutLog := log.New(os.Stdout, "info: ", log.LstdFlags)
