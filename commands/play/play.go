@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/djherbis/times"
 	"github.com/pkg/errors"
@@ -34,6 +35,7 @@ type PlayArgs struct {
 	live             bool
 	edit             bool
 	debug            bool
+	clear            bool
 	tags             []string
 	addToTag         string
 	setToTag         string
@@ -56,6 +58,7 @@ func addFlags(playCmd *cobra.Command, args *PlayArgs) {
 	playCmd.Flags().BoolVar(&args.live, "live", false, "go into live query results mode")
 	playCmd.Flags().BoolVarP(&args.edit, "edit", "e", false, "pipe to $EDITOR for song selection before playing")
 	playCmd.Flags().BoolVar(&args.debug, "debug", false, "enable debug mode")
+	playCmd.Flags().BoolVarP(&args.clear, "clear", "c", false, "clear any existing vlc instances, this uses the special file vlc://quit, so hacky and prone to race conditions")
 
 	playCmd.Flags().StringVarP(&args.addToTag, "add-to-tag", "a", "", "add returned songs to tag")
 	playCmd.Flags().StringVar(&args.setToTag, "set-to-tag", "", "set returned songs to tag")
@@ -272,6 +275,17 @@ func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 func runVLC(args *PlayArgs, vlcArgs []string) error {
 	if args.dryRun {
 		return nil
+	}
+
+	if args.clear {
+		cmd := exec.Command("vlc", "vlc://quit")
+		err := cmd.Run()
+
+		if err != nil {
+			return err
+		}
+
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	if args.new || args.playNewFirst {
