@@ -32,15 +32,16 @@ const (
 	DEFAULT_INTERVAL_SECONDS = 10
 )
 
-func Setup() *cobra.Command {
-	args := LastfmArgs{}
+func WatchSetup() *cobra.Command {
+	args := LastfmWatchArgs{}
 
 	lastfmCommand := &cobra.Command{
-		Use:   "lastfm",
+		Use:   "watch",
 		Short: "Scrobble tracks to last.fm",
 		Long:  "Watch for tracks playing in VLC and scrobble them to last.fm",
+		Args:  cobra.ExactArgs(0),
 		Run: func(cmd *cobra.Command, positional []string) {
-			if err := lastfmRunner(&args); err != nil {
+			if err := watchRunner(&args); err != nil {
 				if args.debug {
 					fmt.Fprintf(os.Stderr, "error: %+v\n", err)
 				} else {
@@ -138,7 +139,7 @@ func getSession(apiKey string, apiSecret string, token string) (Session, error) 
 		return Session{}, err
 	}
 
-	var resultJson GetSessionKeyResponse
+	var resultJson GetSessionResponse
 	err = json.Unmarshal(body, &resultJson)
 
 	if err != nil {
@@ -243,6 +244,8 @@ func setupOrGetCredentials() (Credentials, error) {
 			credentials.ApiSecret = value
 		case "session_key":
 			credentials.SessionKey = value
+		case "username":
+			credentials.Username = value
 		default:
 			return Credentials{}, errors.New("Unknown key in credentials file: " + parts[0])
 		}
@@ -251,28 +254,29 @@ func setupOrGetCredentials() (Credentials, error) {
 	credentialsFile.Close()
 
 	if err := scanner.Err(); err != nil {
-		return Credentials{}, errors.New("Error with reading credentials file: " + err.Error())
+		return credentials, errors.New("Error with reading credentials file: " + err.Error())
 	}
 
 	if credentials.ApiKey == "" {
-		return Credentials{}, errors.New("API key not found in credentials file")
+		return credentials, errors.New("API key not found in credentials file")
 	}
 
 	if credentials.ApiSecret == "" {
-		return Credentials{}, errors.New("API secret not found in credentials file")
+		return credentials, errors.New("API secret not found in credentials file")
 	}
 
 	if credentials.SessionKey == "" {
 		authToken, err := getAuthToken(credentials.ApiKey, credentials.ApiSecret)
 
 		if err != nil {
-			return Credentials{}, errors.New("Error getting auth token: " + err.Error())
+			return credentials, errors.New("Error getting auth token: " + err.Error())
 		}
 
+		fmt.Println("Attempting to open up in browser...")
 		err = open("http://www.last.fm/api/auth/?api_key=" + credentials.ApiKey + "&token=" + authToken)
 
 		if err != nil {
-			return Credentials{}, errors.New("Error opening browser: " + err.Error())
+			return credentials, errors.New("Error opening browser: " + err.Error())
 		}
 
 		fmt.Println("Press enter when you have accepted...")
@@ -281,20 +285,21 @@ func setupOrGetCredentials() (Credentials, error) {
 		session, err := getSession(credentials.ApiKey, credentials.ApiSecret, authToken)
 
 		if err != nil {
-			return Credentials{}, errors.New("Error getting session key: " + err.Error())
+			return credentials, errors.New("Error getting session key: " + err.Error())
 		}
 
 		credentials.SessionKey = session.Key
+		credentials.Username = session.Name
 		credentialsFile, err := os.OpenFile(credentialsPath, os.O_APPEND|os.O_WRONLY, 0644)
 
 		if err != nil {
-			return Credentials{}, errors.New("Error with opening credentials file: " + err.Error())
+			return credentials, errors.New("Error with opening credentials file: " + err.Error())
 		}
 
-		_, err = credentialsFile.WriteString("\nsession_key=" + credentials.SessionKey)
+		_, err = credentialsFile.WriteString("\nsession_key=" + credentials.SessionKey + "\nusername=" + credentials.Username)
 
 		if err != nil {
-			return Credentials{}, errors.New("Error with writing to credentials file: " + err.Error())
+			return credentials, errors.New("Error with writing to credentials file: " + err.Error())
 		}
 	}
 
@@ -431,7 +436,7 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 	}
 }
 
-func lastfmRunner(args *LastfmArgs) error {
+func watchRunner(args *LastfmWatchArgs) error {
 	_, err := exec.LookPath("playerctl")
 
 	if err != nil {

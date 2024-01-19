@@ -4,6 +4,7 @@ type Credentials struct {
 	ApiKey     string
 	ApiSecret  string
 	SessionKey string
+	Username   string
 }
 
 type Session struct {
@@ -18,7 +19,7 @@ type GetAuthTokenResponse struct {
 	Error   int
 }
 
-type GetSessionKeyResponse struct {
+type GetSessionResponse struct {
 	Session Session
 	Message string
 	Error   int
@@ -56,7 +57,31 @@ type PostScrobbleResponse struct {
 	}
 }
 
-type LastfmArgs struct {
+// same interface for /mix /library
+type GetLastfmSuggestionsResponse struct {
+	Playlist []struct {
+		Name     string
+		Url      string
+		Duration int
+		Artists  []struct {
+			Name string
+		}
+		Playlinks []struct {
+			Url       string
+			Id        string
+			Source    string
+			Affiliate string
+		}
+	}
+}
+
+type LastfmWatchArgs struct {
 	interval int
 	debug    bool
+}
+
+type LastfmSuggestArgs struct {
+	debug     bool
+	limit     int
+	printUrls bool
 }

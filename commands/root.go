@@ -14,9 +14,18 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
+	lastfmCommand := &cobra.Command{
+		Use:   "lastfm",
+		Short: "Lastfm utilities",
+		Long:  "Scrobble, get recommendations, and other lastfm functions",
+	}
+
 	rootCmd.AddCommand(play.Setup())
 	rootCmd.AddCommand(tags.Setup())
-	rootCmd.AddCommand(lastfm.Setup())
+	rootCmd.AddCommand(lastfmCommand)
+
+	lastfmCommand.AddCommand(lastfm.WatchSetup())
+	lastfmCommand.AddCommand(lastfm.SuggestSetup())
 
 	rootCmd.AddGroup(&cobra.Group{
 		ID:    "generic",
