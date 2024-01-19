@@ -312,6 +312,8 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 	currentTrackLength := 0.0
 	currentTrackLastPosition := 0.0
 	waitTime := time.Duration(delay) * time.Second
+
+	const realTimeErrorMargin = 10.0
 	var currentTrackFirstTimestamp int64
 
 	for {
@@ -368,55 +370,54 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 		artist := metadata["xesam:artist"]
 		track := metadata["xesam:title"]
 
-		if artist != currentArtist || track != currentTrack {
-			if currentTrack != "" && currentTrackLength != -1.0 {
-				paddedLastPosition := currentTrackLastPosition + DEFAULT_INTERVAL_SECONDS - position
-				timeConditionPassed := -1.0
+		if ((artist != currentArtist || track != currentTrack) || position < currentTrackLastPosition) && currentTrack != "" && currentTrackLength != -1.0 {
+			paddedLastPosition := currentTrackLastPosition + float64(delay) - position
+			timeConditionPassed := -1.0
 
-				if paddedLastPosition > currentTrackLength/2.0 {
-					timeConditionPassed = currentTrackLength / 2.0
-				} else if paddedLastPosition > MIN_LISTEN_TIME {
-					timeConditionPassed = MIN_LISTEN_TIME
-				}
-
-				realTimePassed := float64(time.Now().Unix()-currentTrackFirstTimestamp) / time.Second.Seconds()
-				listenStats := fmt.Sprintf("listened for %.2f, real: %.2f, half len: %.2f, min: %d", paddedLastPosition, realTimePassed, currentTrackLength/2.0, MIN_LISTEN_TIME)
-				realTimeErrorMargin := 10.0
-
-				if timeConditionPassed == -1.0 {
-					stdOut.Printf("└── not scrobbling because it did not pass either listen condition (%s)", listenStats)
-				} else if realTimePassed > timeConditionPassed-realTimeErrorMargin {
-					reason := ""
-
-					if paddedLastPosition > currentTrackLength/2.0 {
-						reason = "it is over half way through"
-					} else {
-						reason = "it has been listened to for over the minimum listen time"
-					}
-
-					stdOut.Printf("└── scrobbling because %s (%s)", reason, listenStats)
-
-					scrobbleResponse, err := scrobble(credentials, currentArtist, currentTrack, currentTrackFirstTimestamp)
-
-					if err != nil {
-						stdErr.Printf("└── last.fm api error - %s", err.Error())
-					}
-
-					if scrobbleResponse.Scrobbles.Attr.Ignored == 1 {
-						stdErr.Printf("└── last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
-					}
-
-				} else {
-					stdOut.Printf("└── not scrobbling because while it did pass the time condition, the real time did not pass (%s)", listenStats)
-				}
+			if paddedLastPosition > currentTrackLength/2.0 {
+				timeConditionPassed = currentTrackLength / 2.0
+			} else if paddedLastPosition > MIN_LISTEN_TIME {
+				timeConditionPassed = MIN_LISTEN_TIME
 			}
 
+			realTimePassed := float64(time.Now().Unix()-currentTrackFirstTimestamp) / time.Second.Seconds()
+			listenStats := fmt.Sprintf("listened for %.2f, real: %.2f, half len: %.2f, min: %d", paddedLastPosition, realTimePassed, currentTrackLength/2.0, MIN_LISTEN_TIME)
+
+			if timeConditionPassed == -1.0 {
+				stdOut.Printf("└── not scrobbling because it did not pass either listen condition (%s)", listenStats)
+			} else if realTimePassed > timeConditionPassed-realTimeErrorMargin {
+				reason := ""
+
+				if paddedLastPosition > currentTrackLength/2.0 {
+					reason = "it is over half way through"
+				} else {
+					reason = "it has been listened to for over the minimum listen time"
+				}
+
+				stdOut.Printf("└── scrobbling because %s (%s)", reason, listenStats)
+
+				scrobbleResponse, err := scrobble(credentials, currentArtist, currentTrack, currentTrackFirstTimestamp)
+
+				if err != nil {
+					stdErr.Printf("└── last.fm api error - %s", err.Error())
+				}
+
+				if scrobbleResponse.Scrobbles.Attr.Ignored == 1 {
+					stdErr.Printf("└── last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
+				}
+
+			} else {
+				stdOut.Printf("└── not scrobbling because while it did pass the time condition, the real time did not pass (%s)", listenStats)
+			}
+		}
+
+		if artist != currentArtist || track != currentTrack {
 			currentTrack = track
 			currentArtist = artist
 			currentTrackLastPosition = position
 			currentTrackFirstTimestamp = time.Now().Unix()
 
-			stdOut.Printf("new song detected - %s - %s\n", artist, track)
+			stdOut.Printf("new song detected - %s - %s", artist, track)
 			length, err := strconv.ParseFloat(metadata["vlc:time"], 64)
 
 			if err != nil {
@@ -429,6 +430,11 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 				currentTrackLength = length
 			}
 		} else {
+			if position < currentTrackLastPosition {
+				stdErr.Printf("└── playerctl - position went backwards")
+				currentTrackFirstTimestamp = time.Now().Unix()
+			}
+
 			currentTrackLastPosition = position
 		}
 
@@ -447,7 +453,6 @@ func watchRunner(args *LastfmWatchArgs) error {
 	signal.Notify(gracefulExit, syscall.SIGINT, syscall.SIGTERM)
 
 	lockFileName := path.Join(os.TempDir(), "music-lastfm.lock")
-	fmt.Println(lockFileName)
 	_, err = os.Stat(lockFileName)
 
 	if err == nil {

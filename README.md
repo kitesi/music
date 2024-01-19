@@ -10,6 +10,7 @@
     -   [Installing music](#installing-music)
     -   [Auto Completion](#auto-completion)
     -   [Lastfm Scrobbling](#lastfm-scrobbling)
+    -   [Lastfm Suggestions](#lastfm-suggestions)
     -   [Android](#android)
     -   [Configuration](#configuration)
 
@@ -151,13 +152,19 @@ like, which is why I use my own personal bash completion. It can be found in
 
 ### Lastfm Scrobbling
 
-While VLC does have built in lastfm scrobbling, I could not get it to work.
-You can run a watch server to watch for playing songs every x seconds (defaulted to 10).
-It uses playerctl under the hood, so you will need to have that installed. It also only
+While VLC does have built in lastfm scrobbling, I could not get it to work
+(edit: I actually got it to work, but it doesn't scrobble certain tracks and I
+kinda already built this so whatever). You can run a watch server to watch for
+playing songs every x seconds (defaulted to 10). It uses playerctl under the
+hood, so you will need to have that installed and be on linux (in the future I
+could add vlc tcp support so that non-linux users could also use). It also only
 checks for the VLC player so other media players or something like youtube will
 not be logged.
 
-Currently, the scrobble detection is kinda poor. It follows the approach of minimizing false positives, so if you skip/seek around, it likely won't scrobble. Also, if you play the same song over and over it won't scrobble more than once (although this will be fixed in the future).
+Currently, the scrobble detection is kinda poor. It follows the approach of
+minimizing false positives, so if you skip/seek around, it likely won't
+scrobble. Also, if you play the same song over and over it won't scrobble more
+than once (although this will be fixed in the future).
 
 Lastly, it follows the [lastfm standards](https://www.last.fm/api/scrobbling):
 
@@ -171,6 +178,14 @@ music lastfm --interval 20 --debug
 ```
 
 I personally have this command start on startup, and redirect the output to `/tmp/music-lastfm.log`.
+
+### Lastfm Suggestions
+
+You can also get lastfm suggestions (on any OS, without authentication) with the suggest command.
+
+```
+music lastfm suggest username --limit 20
+```
 
 ### Android
 
