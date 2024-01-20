@@ -47,7 +47,8 @@ go install github.com/kitesi/music@latest
 
 ## Usage
 
-This program works off a music directory which defaults to `$HOME/Music`. I
+This program works off a music directory which defaults to `$MUSIC_PATH` or `$HOME/Music`.
+Commands that consider a music path will have a `--music-path` option. I
 recommend a folder structure of:
 
 ```text
@@ -171,13 +172,27 @@ Lastly, it follows the [lastfm standards](https://www.last.fm/api/scrobbling):
 1.  The track must be longer than 30 seconds.
 2.  The track has been played for at least half its duration, or for 4 minutes (whichever occurs earlier.)
 
-How to call:
+To get started you first need to create a file (".lastfm-credentials") in your cache directory. Your cache directory is determined by Go below:
+
+-   On Unix systems, it returns `$XDG_CACHE_HOME` as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.cache.
+-   On Darwin, it returns `$HOME/Library/Caches`
+-   On Windows, it returns `%LocalAppData%`
+-   On Plan 9, it returns `$home/lib/cache`
+
+In that file you should store your api_key and your api_secret:
 
 ```
-music lastfm --interval 20 --debug
+api_key=xxxxx
+api_secret=yyyy
 ```
 
-I personally have this command start on startup, and redirect the output to `/tmp/music-lastfm.log`.
+Then just run the lastfm watch command, and it will automatically get the session_key:
+
+```
+music lastfm watch --interval 20 --debug
+```
+
+I personally have this command start on startup, and I redirect the output to `/tmp/music-lastfm.log`.
 
 ### Lastfm Suggestions
 
@@ -187,17 +202,19 @@ You can also get lastfm suggestions (on any OS, without authentication) with the
 music lastfm suggest username --limit 20
 ```
 
+If you would like to automatically install the music add the `--install` flag which will install to `$MUSIC_PATH/Suggestions`.
+
 ### Android
 
 If you would like to use the one of main functionalities of querying on android,
-you can do so using termux. You will likely have to install go first and then
+you can do so using Termux. You will likely have to install go first and then
 follow the instructions in #installation.
 
 After you have the music command installed, you want to download the wrapper script
 in `./android-termux-mx`. This script calls the play command with the given query
 in a dry run so that no program is called. It then sets the results to a new tag (query.m3u).
 
-You should copy the file to a directory in your termux's `$PATH`:
+You should copy the file to a directory in your Termux's `$PATH`:
 
 ```bash
 # assuming your $PATH is just one folder (like default)
@@ -208,11 +225,15 @@ Once you have the script mx, you can now run it like you would `music play`:
 `mx jaxson#tonight`. Now you can open up vlc and see that in your playlists tab
 there should be a playlist called "query."
 
-You are able to install vlc/cvlc/nvlc on termux, but I would not suggest doing
-so because termux will be hanging and you won't have vlc in your notification
-tray.
+You are able to install vlc/cvlc/nvlc on termux, and in turn `music play` will
+work like normal, but I would not suggest doing so because termux will be
+hanging, and you won't have vlc in your notification tray.
 
 ### Configuration
 
-There is no configuration file currently. I would suggest setting up an alias
-with your desired options.
+There is no configuration file currently. I have considered adding one, but this program is
+slow enough. I would suggest setting up an alias with your desired options.
+
+Because no one besides me uses this program, a lot of the utility is centered around my workflow,
+and I skip a lot of customization options. Feel free to submit an issue if you want a feature,
+or just patch it yourself (the codebase is pretty easy to figure it).

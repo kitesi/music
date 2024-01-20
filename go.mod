@@ -3,7 +3,6 @@ module github.com/kitesi/music
 go 1.18
 
 require (
-	github.com/adrg/libvlc-go/v3 v3.1.5
 	github.com/djherbis/times v1.5.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/pkg/errors v0.9.1

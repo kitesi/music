@@ -7,7 +7,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"path"
+	"sync"
 
+	stringUtils "github.com/kitesi/music/string-utils"
 	"github.com/spf13/cobra"
 )
 
@@ -45,8 +49,22 @@ func SuggestSetup() *cobra.Command {
 	lastfmCommand.Flags().BoolVar(&args.debug, "debug", false, "set debug mode")
 	lastfmCommand.Flags().BoolVar(&args.printUrls, "print-urls", true, "print the urls along with the song name")
 	lastfmCommand.Flags().IntVarP(&args.limit, "limit", "l", 10, "limit the number of songs to suggest")
+	lastfmCommand.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "the music path to use")
+	lastfmCommand.Flags().StringVarP(&args.format, "format", "f", "bestaudio[ext=m4a]", "the format to install")
+	lastfmCommand.Flags().BoolVarP(&args.install, "install", "i", false, "install the files to the music path under the 'Suggestions' folder")
 
 	return lastfmCommand
+}
+
+func installSong(args *LastfmSuggestArgs, link string, artist string, title string) error {
+	ytdlArgs := []string{"--extract-audio", "--format", args.format, "--add-metadata", "--postprocessor-args", fmt.Sprintf("-metadata title=\"%s\" -metadata artist=\"%s\"", title, artist), "--output", path.Join(args.musicPath, "Suggestions", fmt.Sprintf("%s - %s.%%(ext)s", artist, title)), link}
+
+	cmd := exec.Command("youtube-dl", ytdlArgs...)
+
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+
+	return cmd.Run()
 }
 
 func suggestRunner(args *LastfmSuggestArgs, username string) error {
@@ -93,6 +111,18 @@ func suggestRunner(args *LastfmSuggestArgs, username string) error {
 		args.limit = len(resultJson.Playlist)
 	}
 
+	if args.install && args.musicPath == "" {
+		defaultMusicPath, err := stringUtils.GetDefaultMusicPath()
+
+		if err != nil {
+			return err
+		}
+
+		args.musicPath = defaultMusicPath
+	}
+
+	var installWaitGroup sync.WaitGroup
+
 	for i := 0; i < args.limit; i++ {
 		item := resultJson.Playlist[i]
 		albumArtist := ""
@@ -108,24 +138,33 @@ func suggestRunner(args *LastfmSuggestArgs, username string) error {
 		}
 
 		fmt.Printf("%s - %s", albumArtist, item.Name)
+		playUrl := ""
 
-		if args.printUrls {
-			playUrl := ""
-
+		if args.printUrls || args.install {
 			for _, playlink := range item.Playlinks {
 				if playlink.Url != "" {
 					playUrl = playlink.Url
 					break
 				}
 			}
+		}
 
-			if playUrl != "" {
-				fmt.Printf(" (%s)", playUrl)
-			}
+		if args.printUrls && playUrl != "" {
+			fmt.Printf(" (%s)", playUrl)
 		}
 
 		fmt.Println()
+
+		if args.install && playUrl != "" {
+			installWaitGroup.Add(1)
+
+			go func() {
+				defer installWaitGroup.Done()
+				installSong(args, playUrl, albumArtist, item.Name)
+			}()
+		}
 	}
 
+	installWaitGroup.Wait()
 	return nil
 }

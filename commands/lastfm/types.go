@@ -82,6 +82,9 @@ type LastfmWatchArgs struct {
 
 type LastfmSuggestArgs struct {
 	debug     bool
-	limit     int
 	printUrls bool
+	install   bool
+	limit     int
+	musicPath string
+	format    string
 }
