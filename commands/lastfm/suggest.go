@@ -92,6 +92,10 @@ func suggestRunner(args *LastfmSuggestArgs, username string) error {
 		return fmt.Errorf("Could not get url - %s", err.Error())
 	}
 
+	if resp.StatusCode > 299 {
+		return errors.New(resp.Status)
+	}
+
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)

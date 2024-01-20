@@ -94,6 +94,10 @@ func getAuthToken(apiKey string, apiSecret string) (string, error) {
 		return "", err
 	}
 
+	if resp.StatusCode > 299 {
+		return "", errors.New(resp.Status)
+	}
+
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
@@ -129,6 +133,10 @@ func getSession(apiKey string, apiSecret string, token string) (Session, error) 
 
 	if err != nil {
 		return Session{}, err
+	}
+
+	if resp.StatusCode > 299 {
+		return Session{}, errors.New(resp.Status)
 	}
 
 	defer resp.Body.Close()
@@ -168,6 +176,10 @@ func scrobble(credentials Credentials, artist string, track string, timestamp in
 
 	if err != nil {
 		return PostScrobbleResponse{}, err
+	}
+
+	if resp.StatusCode > 299 {
+		return PostScrobbleResponse{}, errors.New(resp.Status)
 	}
 
 	defer resp.Body.Close()
@@ -478,7 +490,7 @@ func watchRunner(args *LastfmWatchArgs) error {
 		return err
 	}
 
-	stdOutLog := log.New(os.Stdout, "info: ", log.LstdFlags)
+	stdOutLog := log.New(os.Stdout, "info : ", log.LstdFlags)
 	stdErrLog := log.New(os.Stderr, "error: ", log.LstdFlags)
 
 	if !args.debug {
