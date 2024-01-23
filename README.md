@@ -1,5 +1,7 @@
 # Music CLI
 
+![Demo of the Query Functionality](./assets/query-demo.gif)
+
 -   [About](#about)
 -   [Requirements](#requirements)
 -   [Installation](#installation)
@@ -98,6 +100,8 @@ When combining these terms, the string is split by `#` first, and then `,`.
 
 #### Live Results
 
+![Demo of Live Query Results](./assets/live-query-demo.gif)
+
 You can use `music play --live` to get a live query search of your songs.
 I personally bind this command to a keybinding of `Ctrl+Alt+m`. I also have an
 i3 keybinding to `Meta+m+x` so that it spawns a terminal with just the program.
@@ -172,7 +176,7 @@ Lastly, it follows the [lastfm standards](https://www.last.fm/api/scrobbling):
 1.  The track must be longer than 30 seconds.
 2.  The track has been played for at least half its duration, or for 4 minutes (whichever occurs earlier.)
 
-To get started you first need to create a file (".lastfm-credentials") in your cache directory. Your cache directory is determined by Go below:
+To get started first make an api account and application on [last.fm](https://www.last.fm/api/account/create). You then need to create a file (".lastfm-credentials") in your cache directory. Your cache directory is determined by Go below:
 
 -   On Unix systems, it returns `$XDG_CACHE_HOME` as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.cache.
 -   On Darwin, it returns `$HOME/Library/Caches`
