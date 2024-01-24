@@ -243,8 +243,6 @@ func getSongs(args *PlayArgs, terms []string) ([]string, error) {
 	}
 
 	if args.limit > 0 && len(songs) > args.limit {
-		fmt.Println(args.limit)
-
 		songs = songs[:args.limit]
 	}
 
