@@ -127,14 +127,14 @@ InfiniteLoop:
 	for {
 		writeToScreen(query, lastSongs, subPlayArgs.musicPath)
 
-		b := make([]byte, 1)
+		b := make([]byte, 3)
 		_, err = os.Stdin.Read(b)
 
 		if err != nil {
 			return err
 		}
 
-		key := string(b[0])
+		key := strings.TrimRight(string(b), "\x00")
 
 		if key == "\"" && !unclosedSingleQuote {
 			unclosedDoubleQuote = !unclosedDoubleQuote
@@ -144,14 +144,21 @@ InfiniteLoop:
 
 		// todo: prob better way
 		switch string(key) {
-		// ctrl-c, ctrl-[ (escape)
-		case "\x03", "\x1B":
+		// ctrl-c, ctrl-[ (escape), ctrl-d
+		case "\x03", "\x1B", "\x04":
 			fmt.Print("\r")
 			clearScreenDown()
 			break InfiniteLoop
 		// backspace
 		case "\x7F":
 			if len(query) != 0 {
+
+				if query[len(query)-1] == '"' {
+					unclosedDoubleQuote = !unclosedDoubleQuote
+				} else if query[len(query)-1] == '\'' {
+					unclosedSingleQuote = !unclosedSingleQuote
+				}
+
 				query = query[:len(query)-1]
 			}
 		// ctrl-u
