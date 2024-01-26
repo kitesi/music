@@ -30,6 +30,7 @@ const (
 	MIN_TRACK_LEN            = 30
 	MIN_LISTEN_TIME          = 4 * 60
 	DEFAULT_INTERVAL_SECONDS = 10
+	REAL_TIME_ERROR_MARGIN   = 10.0
 )
 
 func WatchSetup() *cobra.Command {
@@ -318,30 +319,78 @@ func setupOrGetCredentials() (Credentials, error) {
 	return credentials, nil
 }
 
-func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdErr *log.Logger) {
-	currentTrack := ""
-	currentArtist := ""
-	currentTrackLength := 0.0
-	currentTrackLastPosition := 0.0
-	waitTime := time.Duration(delay) * time.Second
+func getCurrentPosition() (float64, error) {
+	positionCmd := exec.Command("playerctl", "-p", "vlc", "position")
+	positionOutput, err := positionCmd.Output()
 
-	const realTimeErrorMargin = 10.0
-	var currentTrackFirstTimestamp int64
+	if err != nil || string(positionOutput) == "No player could handle this command" {
+		return 0.0, errors.New("playerctl - no player could handle this command")
+	}
 
-	for {
-		positionCmd := exec.Command("playerctl", "-p", "vlc", "position")
-		positionOutput, err := positionCmd.Output()
+	position, err := strconv.ParseFloat(strings.TrimSpace(string(positionOutput)), 64)
 
-		if err != nil || string(positionOutput) == "No player could handle this command" {
-			stdErr.Println("playerctl - no player could handle this command")
-			time.Sleep(waitTime)
-			continue
+	if err != nil {
+		return 0.0, errors.New("playerctl - could not parse position")
+	}
+
+	return position, nil
+}
+
+func attemptScrobble(credentials Credentials, currentTrack *CurrentTrackInfo, currentPosition float64, delay int, stdOut *log.Logger, stdErr *log.Logger) {
+	paddedLastPosition := currentTrack.LastPosition + float64(delay) - currentPosition
+	timeConditionPassed := -1.0
+
+	if paddedLastPosition > currentTrack.Length/2.0 {
+		timeConditionPassed = currentTrack.Length / 2.0
+	} else if paddedLastPosition > MIN_LISTEN_TIME {
+		timeConditionPassed = MIN_LISTEN_TIME
+	}
+
+	realTimePassed := float64(time.Now().Unix()-currentTrack.StartTime) / time.Second.Seconds()
+	listenStats := fmt.Sprintf("listened for %.2f, real: %.2f, half len: %.2f, min: %d", paddedLastPosition, realTimePassed, currentTrack.Length/2.0, MIN_LISTEN_TIME)
+
+	if timeConditionPassed == -1.0 {
+		stdOut.Printf("└── not scrobbling because it did not pass either listen condition (%s)", listenStats)
+	} else if realTimePassed > timeConditionPassed-REAL_TIME_ERROR_MARGIN {
+		reason := ""
+
+		if paddedLastPosition > currentTrack.Length/2.0 {
+			reason = "it is over half way through"
+		} else {
+			reason = "it has been listened to for over the minimum listen time"
 		}
 
-		position, err := strconv.ParseFloat(strings.TrimSpace(string(positionOutput)), 64)
+		stdOut.Printf("└── scrobbling because %s (%s)", reason, listenStats)
+
+		scrobbleResponse, err := scrobble(credentials, currentTrack.Artist, currentTrack.Track, currentTrack.StartTime)
 
 		if err != nil {
-			stdErr.Println("playerctl - could not parse position")
+			stdErr.Printf("└── last.fm api error - %s", err.Error())
+		}
+
+		if scrobbleResponse.Scrobbles.Attr.Ignored == 1 {
+			stdErr.Printf("└── last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
+		}
+
+	} else {
+		stdOut.Printf("└── not scrobbling because while it did pass the time condition, the real time did not pass (%s)", listenStats)
+	}
+}
+
+func watchForTracks(credentials Credentials, currentTrack *CurrentTrackInfo, delay int, stdOut *log.Logger, stdErr *log.Logger) {
+	waitTime := time.Duration(delay) * time.Second
+
+	for {
+		position, err := getCurrentPosition()
+
+		if err != nil {
+			if currentTrack.Track != "" {
+				attemptScrobble(credentials, currentTrack, 0, delay, stdOut, stdErr)
+				currentTrack.Track = ""
+				currentTrack.Artist = ""
+			}
+
+			stdErr.Println(err)
 			time.Sleep(waitTime)
 			continue
 		}
@@ -374,7 +423,7 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 		}
 
 		if metadata["xesam:artist"] == "" || metadata["xesam:title"] == "" || metadata["vlc:length"] == "" {
-			stdErr.Println("playerctl - could not get metadata")
+			stdErr.Println("playerctl - could get metadata but not the necessary fields")
 			time.Sleep(waitTime)
 			continue
 		}
@@ -382,76 +431,47 @@ func watchForTracks(credentials Credentials, delay int, stdOut *log.Logger, stdE
 		artist := metadata["xesam:artist"]
 		track := metadata["xesam:title"]
 
-		if ((artist != currentArtist || track != currentTrack) || position < currentTrackLastPosition) && currentTrack != "" && currentTrackLength != -1.0 {
-			paddedLastPosition := currentTrackLastPosition + float64(delay) - position
-			timeConditionPassed := -1.0
-
-			if paddedLastPosition > currentTrackLength/2.0 {
-				timeConditionPassed = currentTrackLength / 2.0
-			} else if paddedLastPosition > MIN_LISTEN_TIME {
-				timeConditionPassed = MIN_LISTEN_TIME
-			}
-
-			realTimePassed := float64(time.Now().Unix()-currentTrackFirstTimestamp) / time.Second.Seconds()
-			listenStats := fmt.Sprintf("listened for %.2f, real: %.2f, half len: %.2f, min: %d", paddedLastPosition, realTimePassed, currentTrackLength/2.0, MIN_LISTEN_TIME)
-
-			if timeConditionPassed == -1.0 {
-				stdOut.Printf("└── not scrobbling because it did not pass either listen condition (%s)", listenStats)
-			} else if realTimePassed > timeConditionPassed-realTimeErrorMargin {
-				reason := ""
-
-				if paddedLastPosition > currentTrackLength/2.0 {
-					reason = "it is over half way through"
-				} else {
-					reason = "it has been listened to for over the minimum listen time"
-				}
-
-				stdOut.Printf("└── scrobbling because %s (%s)", reason, listenStats)
-
-				scrobbleResponse, err := scrobble(credentials, currentArtist, currentTrack, currentTrackFirstTimestamp)
-
-				if err != nil {
-					stdErr.Printf("└── last.fm api error - %s", err.Error())
-				}
-
-				if scrobbleResponse.Scrobbles.Attr.Ignored == 1 {
-					stdErr.Printf("└── last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
-				}
-
-			} else {
-				stdOut.Printf("└── not scrobbling because while it did pass the time condition, the real time did not pass (%s)", listenStats)
-			}
+		if ((artist != currentTrack.Artist || track != currentTrack.Track) || position < currentTrack.LastPosition) && currentTrack.Track != "" && currentTrack.Length != -1.0 {
+			attemptScrobble(credentials, currentTrack, position, delay, stdOut, stdErr)
 		}
 
-		if artist != currentArtist || track != currentTrack {
-			currentTrack = track
-			currentArtist = artist
-			currentTrackLastPosition = position
-			currentTrackFirstTimestamp = time.Now().Unix()
+		if artist != currentTrack.Artist || track != currentTrack.Track {
+			currentTrack.Track = track
+			currentTrack.Artist = artist
+			currentTrack.LastPosition = position
+			currentTrack.StartTime = time.Now().Unix()
 
 			stdOut.Printf("new song detected - %s - %s", artist, track)
 			length, err := strconv.ParseFloat(metadata["vlc:time"], 64)
 
 			if err != nil {
 				stdErr.Printf("└── playerctl - could not parse length of")
-				currentTrackLength = -1.0
+				currentTrack.Length = -1.0
 			} else if length < MIN_TRACK_LEN {
 				stdOut.Printf("└── skipping track because it is too short")
-				currentTrackLength = -1.0
+				currentTrack.Length = -1.0
 			} else {
-				currentTrackLength = length
+				currentTrack.Length = length
 			}
 		} else {
-			if position < currentTrackLastPosition {
+			if position < currentTrack.LastPosition {
 				stdErr.Printf("└── playerctl - position went backwards")
-				currentTrackFirstTimestamp = time.Now().Unix()
+				currentTrack.StartTime = time.Now().Unix()
 			}
 
-			currentTrackLastPosition = position
+			currentTrack.LastPosition = position
 		}
 
 		time.Sleep(waitTime)
 	}
+}
+
+type CurrentTrackInfo struct {
+	Track        string
+	Artist       string
+	LastPosition float64
+	StartTime    int64
+	Length       float64
 }
 
 func watchRunner(args *LastfmWatchArgs) error {
@@ -471,25 +491,19 @@ func watchRunner(args *LastfmWatchArgs) error {
 		return fmt.Errorf("server is already running - if it is not, delete %s and try again", lockFileName)
 	}
 
-	lockFile, err := os.Create(lockFileName)
-
-	if err != nil {
-		return errors.New("could not create lock file")
-	}
-
-	go func() {
-		<-gracefulExit
-		lockFile.Close()
-		os.Remove(lockFileName)
-		os.Exit(0)
-	}()
-
 	credentials, err := setupOrGetCredentials()
 
 	if err != nil {
 		return err
 	}
 
+	lockFile, err := os.Create(lockFileName)
+
+	if err != nil {
+		return errors.New("could not create lock file")
+	}
+
+	currentTrack := CurrentTrackInfo{}
 	stdOutLog := log.New(os.Stdout, "info : ", log.LstdFlags)
 	stdErrLog := log.New(os.Stderr, "error: ", log.LstdFlags)
 
@@ -497,6 +511,26 @@ func watchRunner(args *LastfmWatchArgs) error {
 		stdErrLog.SetOutput(io.Discard)
 	}
 
-	watchForTracks(credentials, args.interval, stdOutLog, stdErrLog)
+	go func() {
+		<-gracefulExit
+		lockFile.Close()
+		os.Remove(lockFileName)
+
+		if currentTrack.Track != "" {
+			position, err := getCurrentPosition()
+
+			if err != nil {
+				stdErrLog.Println("could not get position when gracefully exiting")
+			} else {
+				attemptScrobble(credentials, &currentTrack, position, args.interval, stdOutLog, stdErrLog)
+			}
+		} else {
+			stdOutLog.Println("did not find any track when gracefully exiting")
+		}
+
+		os.Exit(0)
+	}()
+
+	watchForTracks(credentials, &currentTrack, args.interval, stdOutLog, stdErrLog)
 	return nil
 }
