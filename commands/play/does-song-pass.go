@@ -3,7 +3,7 @@ package play
 import (
 	"strings"
 
-	arrayUtils "github.com/kitesi/music/array-utils"
+	"github.com/kitesi/music/utils"
 )
 
 func doesSongPass(args *PlayArgs, savedTags map[string][]string, terms []string, songPath string) bool {
@@ -26,7 +26,7 @@ func doesSongPass(args *PlayArgs, savedTags map[string][]string, terms []string,
 		}
 
 		for k, v := range savedTags {
-			if strings.Contains(k, tag) && arrayUtils.Some(v, isSong) {
+			if strings.Contains(k, tag) && utils.Some(v, isSong) {
 				return true
 			}
 		}
@@ -54,7 +54,7 @@ func doesSongPass(args *PlayArgs, savedTags map[string][]string, terms []string,
 		}
 	}
 
-	if !passedOneTerm && arrayUtils.Every(terms, func(term string) bool {
+	if !passedOneTerm && utils.Every(terms, func(term string) bool {
 		return strings.HasPrefix(term, "!")
 	}) {
 		passedOneTerm = true
@@ -67,8 +67,8 @@ func validateQuery(query string, validator func(string) bool) bool {
 	query = strings.TrimPrefix(strings.ToLower(query), "!")
 	requiredSections := strings.Split(query, "#")
 
-	return arrayUtils.Every(requiredSections, func(section string) bool {
-		return arrayUtils.Some(strings.Split(section, ","), func(word string) bool {
+	return utils.Every(requiredSections, func(section string) bool {
+		return utils.Some(strings.Split(section, ","), func(word string) bool {
 			return validator(word)
 		})
 	})

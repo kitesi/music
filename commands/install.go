@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
-	stringUtils "github.com/kitesi/music/string-utils"
+	"github.com/kitesi/music/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -50,7 +50,7 @@ func installRunner(args *InstallArgs, positional []string) error {
 	folder := positional[1]
 
 	if args.musicPath == "" {
-		defaultMusicPath, err := stringUtils.GetDefaultMusicPath()
+		defaultMusicPath, err := utils.GetDefaultMusicPath()
 
 		if err != nil {
 			return err

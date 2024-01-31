@@ -3,11 +3,11 @@ package play
 import (
 	"strings"
 
-	"github.com/kitesi/music/editor"
+	"github.com/kitesi/music/utils"
 )
 
 func editSongList(songs []string) ([]string, error) {
-	content, err := editor.CreateAndModifyTemp("", "music-playlist-*.txt", strings.Join(songs, "\n"))
+	content, err := utils.CreateAndModifyTemp("", "music-playlist-*.txt", strings.Join(songs, "\n"))
 
 	if err != nil {
 		return nil, err

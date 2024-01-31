@@ -11,9 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	arrayUtils "github.com/kitesi/music/array-utils"
-	"github.com/kitesi/music/editor"
-	stringUtils "github.com/kitesi/music/string-utils"
+	"github.com/kitesi/music/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -112,7 +110,7 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 	}
 
 	if args.musicPath == "" {
-		defaultMusicPath, err := stringUtils.GetDefaultMusicPath()
+		defaultMusicPath, err := utils.GetDefaultMusicPath()
 
 		if err != nil {
 			return fmt.Errorf("could not getting default music path: %w", err)
@@ -202,7 +200,7 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 				return fmt.Errorf("could not write tag file: %w", err)
 			}
 
-			_, err = editor.EditFile(tagPath)
+			_, err = utils.EditFile(tagPath)
 
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
@@ -241,10 +239,10 @@ func ChangeSongsInTag(musicPath string, tagName string, songs []string, shouldAp
 	tagSongs, ok := storedTags[tagName]
 
 	if !ok || !shouldAppend {
-		tagSongs = arrayUtils.FilterEmptyStrings(songs)
+		tagSongs = utils.FilterEmptyStrings(songs)
 	} else {
 		for _, song := range songs {
-			if song != "" && !arrayUtils.Includes(tagSongs, song) {
+			if song != "" && !utils.Includes(tagSongs, song) {
 				tagSongs = append(tagSongs, song)
 			}
 		}

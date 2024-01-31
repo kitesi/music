@@ -11,7 +11,7 @@ import (
 	"path"
 	"sync"
 
-	stringUtils "github.com/kitesi/music/string-utils"
+	"github.com/kitesi/music/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -116,7 +116,7 @@ func suggestRunner(args *LastfmSuggestArgs, username string) error {
 	}
 
 	if args.install && args.musicPath == "" {
-		defaultMusicPath, err := stringUtils.GetDefaultMusicPath()
+		defaultMusicPath, err := utils.GetDefaultMusicPath()
 
 		if err != nil {
 			return err

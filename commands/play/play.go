@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kitesi/music/commands/tags"
-	stringUtils "github.com/kitesi/music/string-utils"
+	"github.com/kitesi/music/utils"
 )
 
 type Song struct {
@@ -103,7 +103,7 @@ func Setup() *cobra.Command {
 
 func playRunner(args *PlayArgs, terms []string) error {
 	if args.musicPath == "" {
-		defaultMusicPath, err := stringUtils.GetDefaultMusicPath()
+		defaultMusicPath, err := utils.GetDefaultMusicPath()
 
 		if err != nil {
 			return err
@@ -160,7 +160,7 @@ func playRunner(args *PlayArgs, terms []string) error {
 		fmt.Printf("Playing [%d]\n", len(songs))
 
 		for _, s := range songs {
-			fmt.Printf("- %s\n", stringUtils.GetBareSongName(s, args.musicPath))
+			fmt.Printf("- %s\n", utils.GetBareSongName(s, args.musicPath))
 		}
 	}
 
