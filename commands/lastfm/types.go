@@ -75,9 +75,19 @@ type GetLastfmSuggestionsResponse struct {
 	}
 }
 
+type CurrentTrackInfo struct {
+	Track        string
+	Artist       string
+	LastPosition float64
+	StartTime    int64
+	Length       float64
+}
+
 type LastfmWatchArgs struct {
-	interval int
-	debug    bool
+	interval       int
+	minTrackLength int
+	minListenTime  int
+	debug          bool
 }
 
 type LastfmSuggestArgs struct {

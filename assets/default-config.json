@@ -1,0 +1,9 @@
+{
+    "musicPath": "/home/username/Music",
+    "debug": false,
+    "lastfm": {
+        "interval": 10,
+        "minTrackLength": 30,
+        "minListenTime": 240
+    }
+}

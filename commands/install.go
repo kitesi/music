@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -37,10 +38,16 @@ func init() {
 		},
 	}
 
+	config, err := utils.GetConfig()
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %+v\n", err)
+	}
+
 	installCmd.Flags().StringVarP(&args.format, "format", "f", "m4a", "format to install to")
 	installCmd.Flags().StringVarP(&args.ytdlArgs, "ytdl-args", "y", "", "additional arguments to send to youtube-dl")
 	installCmd.Flags().StringVarP(&args.name, "name", "n", "", "the file name to install to")
-	installCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "the music path to use")
+	installCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", config.MusicPath, "the music path to use")
 
 	rootCmd.AddCommand(installCmd)
 }
@@ -48,16 +55,6 @@ func init() {
 func installRunner(args *InstallArgs, positional []string) error {
 	id := positional[0]
 	folder := positional[1]
-
-	if args.musicPath == "" {
-		defaultMusicPath, err := utils.GetDefaultMusicPath()
-
-		if err != nil {
-			return err
-		}
-
-		args.musicPath = defaultMusicPath
-	}
 
 	possibleFolders, err := os.ReadDir(args.musicPath)
 

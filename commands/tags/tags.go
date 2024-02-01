@@ -3,7 +3,6 @@ package tags
 import (
 	// "errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -87,11 +86,17 @@ func Setup() *cobra.Command {
 		},
 	}
 
+	config, err := utils.GetConfig()
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %+v\n", err)
+	}
+
 	tagsCmd.Flags().BoolVarP(&args.edit, "edit", "e", false, "edit tags.json or a specific tag with $EDITOR")
 	tagsCmd.Flags().BoolVarP(&args.check, "check", "c", false, "check if the songs exist under the given tags")
 	tagsCmd.Flags().BoolVarP(&args.shouldDelete, "delete", "d", false, "delete a tag")
-	tagsCmd.Flags().BoolVar(&args.debug, "debug", false, "enable debug mode")
-	tagsCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", "", "the music path to use")
+	tagsCmd.Flags().BoolVar(&args.debug, "debug", config.Debug, "enable debug mode")
+	tagsCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", config.MusicPath, "the music path to use")
 
 	return tagsCmd
 }
@@ -107,16 +112,6 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 		return errors.New("can't use --edit with --check")
 	} else if args.check && args.shouldDelete {
 		return errors.New("can't use --delete with --check")
-	}
-
-	if args.musicPath == "" {
-		defaultMusicPath, err := utils.GetDefaultMusicPath()
-
-		if err != nil {
-			return fmt.Errorf("could not getting default music path: %w", err)
-		}
-
-		args.musicPath = defaultMusicPath
 	}
 
 	if args.check {
@@ -139,7 +134,7 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 			for _, song := range tag {
 				_, err := os.Stat(song)
 
-				if errors.Is(err, fs.ErrNotExist) {
+				if os.IsNotExist(err) {
 					allSongsExist = false
 					fmt.Fprintf(os.Stderr, "error: song \"%s\" does not exist\n", song)
 				} else if err != nil {
@@ -173,7 +168,7 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 	_, err := os.Stat(filepath.Join(args.musicPath, "tags"))
 
 	// create the tags directory if it doesn't exist
-	if errors.Is(err, fs.ErrNotExist) {
+	if os.IsNotExist(err) {
 		if args.shouldDelete {
 			return errors.New("there are no tags to delete")
 		}
@@ -251,7 +246,7 @@ func ChangeSongsInTag(musicPath string, tagName string, songs []string, shouldAp
 	if shouldAppend {
 		_, err := os.Stat(tagPath)
 
-		if errors.Is(err, fs.ErrNotExist) {
+		if os.IsNotExist(err) {
 			tagContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)}
 		} else if err != nil {
 			return fmt.Errorf("could not get tag file: %w", err)

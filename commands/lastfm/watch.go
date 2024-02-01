@@ -22,15 +22,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kitesi/music/utils"
 	"github.com/spf13/cobra"
 )
 
 const (
-	API_END_POINT            = "http://ws.audioscrobbler.com/2.0/"
-	MIN_TRACK_LEN            = 30
-	MIN_LISTEN_TIME          = 4 * 60
-	DEFAULT_INTERVAL_SECONDS = 10
-	REAL_TIME_ERROR_MARGIN   = 10.0
+	API_END_POINT          = "http://ws.audioscrobbler.com/2.0/"
+	REAL_TIME_ERROR_MARGIN = 10.0
 )
 
 func WatchSetup() *cobra.Command {
@@ -53,8 +51,16 @@ func WatchSetup() *cobra.Command {
 		},
 	}
 
-	lastfmCommand.Flags().IntVarP(&args.interval, "interval", "i", DEFAULT_INTERVAL_SECONDS, "interval in seconds to check for new tracks")
-	lastfmCommand.Flags().BoolVar(&args.debug, "debug", false, "set debug mode")
+	config, err := utils.GetConfig()
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %+v\n", err)
+	}
+
+	lastfmCommand.Flags().IntVarP(&args.interval, "interval", "i", config.LastFm.Interval, "interval in seconds to check for new tracks")
+	lastfmCommand.Flags().IntVar(&args.minTrackLength, "min-track-length", config.LastFm.MinTrackLength, "the minimum track length to scrobble")
+	lastfmCommand.Flags().IntVar(&args.minListenTime, "min-listen-length", config.LastFm.MinListenTime, "the minimum listem time to scrobble (as a shorter alternative to half way through the track)")
+	lastfmCommand.Flags().BoolVar(&args.debug, "debug", config.Debug, "set debug mode")
 
 	return lastfmCommand
 }
@@ -337,18 +343,18 @@ func getCurrentPosition() (float64, error) {
 	return position, nil
 }
 
-func attemptScrobble(credentials Credentials, currentTrack *CurrentTrackInfo, currentPosition float64, delay int, stdOut *log.Logger, stdErr *log.Logger) {
-	paddedLastPosition := currentTrack.LastPosition + float64(delay) - currentPosition
+func attemptScrobble(credentials Credentials, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, currentPosition float64, stdOut *log.Logger, stdErr *log.Logger) {
+	paddedLastPosition := currentTrack.LastPosition + float64(args.interval) - currentPosition
 	timeConditionPassed := -1.0
 
 	if paddedLastPosition > currentTrack.Length/2.0 {
 		timeConditionPassed = currentTrack.Length / 2.0
-	} else if paddedLastPosition > MIN_LISTEN_TIME {
-		timeConditionPassed = MIN_LISTEN_TIME
+	} else if paddedLastPosition > float64(args.minListenTime) {
+		timeConditionPassed = float64(args.minListenTime)
 	}
 
 	realTimePassed := float64(time.Now().Unix()-currentTrack.StartTime) / time.Second.Seconds()
-	listenStats := fmt.Sprintf("listened for %.2f, real: %.2f, half len: %.2f, min: %d", paddedLastPosition, realTimePassed, currentTrack.Length/2.0, MIN_LISTEN_TIME)
+	listenStats := fmt.Sprintf("listened for %.2f, real: %.2f, half len: %.2f, min: %d", paddedLastPosition, realTimePassed, currentTrack.Length/2.0, args.minListenTime)
 
 	if timeConditionPassed == -1.0 {
 		stdOut.Printf("└── not scrobbling because it did not pass either listen condition (%s)", listenStats)
@@ -378,15 +384,15 @@ func attemptScrobble(credentials Credentials, currentTrack *CurrentTrackInfo, cu
 	}
 }
 
-func watchForTracks(credentials Credentials, currentTrack *CurrentTrackInfo, delay int, stdOut *log.Logger, stdErr *log.Logger) {
-	waitTime := time.Duration(delay) * time.Second
+func watchForTracks(credentials Credentials, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, stdOut *log.Logger, stdErr *log.Logger) {
+	waitTime := time.Duration(args.interval) * time.Second
 
 	for {
 		position, err := getCurrentPosition()
 
 		if err != nil {
 			if currentTrack.Track != "" {
-				attemptScrobble(credentials, currentTrack, 0, delay, stdOut, stdErr)
+				attemptScrobble(credentials, currentTrack, args, 0.0, stdOut, stdErr)
 				currentTrack.Track = ""
 				currentTrack.Artist = ""
 			}
@@ -433,7 +439,7 @@ func watchForTracks(credentials Credentials, currentTrack *CurrentTrackInfo, del
 		track := metadata["xesam:title"]
 
 		if ((artist != currentTrack.Artist || track != currentTrack.Track) || position < currentTrack.LastPosition) && currentTrack.Track != "" && currentTrack.Length != -1.0 {
-			attemptScrobble(credentials, currentTrack, position, delay, stdOut, stdErr)
+			attemptScrobble(credentials, currentTrack, args, position, stdOut, stdErr)
 		}
 
 		if artist != currentTrack.Artist || track != currentTrack.Track {
@@ -448,7 +454,7 @@ func watchForTracks(credentials Credentials, currentTrack *CurrentTrackInfo, del
 			if err != nil {
 				stdErr.Printf("└── playerctl - could not parse length of")
 				currentTrack.Length = -1.0
-			} else if length < MIN_TRACK_LEN {
+			} else if length < float64(args.minTrackLength) {
 				stdOut.Printf("└── skipping track because it is too short")
 				currentTrack.Length = -1.0
 			} else {
@@ -465,14 +471,6 @@ func watchForTracks(credentials Credentials, currentTrack *CurrentTrackInfo, del
 
 		time.Sleep(waitTime)
 	}
-}
-
-type CurrentTrackInfo struct {
-	Track        string
-	Artist       string
-	LastPosition float64
-	StartTime    int64
-	Length       float64
 }
 
 func watchRunner(args *LastfmWatchArgs) error {
@@ -523,7 +521,7 @@ func watchRunner(args *LastfmWatchArgs) error {
 			if err != nil {
 				stdErrLog.Println("could not get position when gracefully exiting")
 			} else {
-				attemptScrobble(credentials, &currentTrack, position, args.interval, stdOutLog, stdErrLog)
+				attemptScrobble(credentials, &currentTrack, args, position, stdOutLog, stdErrLog)
 			}
 		} else {
 			stdOutLog.Println("did not find any track when gracefully exiting")
@@ -532,6 +530,6 @@ func watchRunner(args *LastfmWatchArgs) error {
 		os.Exit(0)
 	}()
 
-	watchForTracks(credentials, &currentTrack, args.interval, stdOutLog, stdErrLog)
+	watchForTracks(credentials, &currentTrack, args, stdOutLog, stdErrLog)
 	return nil
 }

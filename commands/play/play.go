@@ -47,6 +47,12 @@ type PlayArgs struct {
 }
 
 func addFlags(playCmd *cobra.Command, args *PlayArgs) {
+	config, err := utils.GetConfig()
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %+v\n", err)
+	}
+
 	playCmd.Flags().BoolVarP(&args.dryRun, "dry-run", "d", false, "dry run vlc")
 	playCmd.Flags().BoolVarP(&args.dryPaths, "dry-paths", "p", false, "only print out paths (absolute)")
 	playCmd.Flags().BoolVarP(&args.random, "random", "z", false, "play by random")
@@ -57,13 +63,13 @@ func addFlags(playCmd *cobra.Command, args *PlayArgs) {
 	playCmd.Flags().BoolVar(&args.appendToPlaylist, "append", false, "append to playlist rather than jumping")
 	playCmd.Flags().BoolVar(&args.live, "live", false, "go into live query results mode")
 	playCmd.Flags().BoolVarP(&args.edit, "edit", "e", false, "pipe to $EDITOR for song selection before playing")
-	playCmd.Flags().BoolVar(&args.debug, "debug", false, "enable debug mode")
+	playCmd.Flags().BoolVar(&args.debug, "debug", config.Debug, "enable debug mode")
 	playCmd.Flags().BoolVarP(&args.clear, "clear", "c", false, "clear any existing vlc instances, this uses the special file vlc://quit, so hacky and prone to race conditions")
 
 	playCmd.Flags().StringVarP(&args.addToTag, "add-to-tag", "a", "", "add returned songs to tag")
 	playCmd.Flags().StringVar(&args.setToTag, "set-to-tag", "", "set returned songs to tag")
 	playCmd.Flags().StringVar(&args.vlcPath, "vlc-path", "vlc", "path to vlc executable to use")
-	playCmd.Flags().StringVar(&args.musicPath, "music-path", "", "the music path to use")
+	playCmd.Flags().StringVarP(&args.musicPath, "music-path", "m", config.MusicPath, "the music path to use")
 
 	playCmd.Flags().StringArrayVarP(&args.tags, "tags", "t", []string{}, "tags to match")
 
@@ -102,16 +108,6 @@ func Setup() *cobra.Command {
 }
 
 func playRunner(args *PlayArgs, terms []string) error {
-	if args.musicPath == "" {
-		defaultMusicPath, err := utils.GetDefaultMusicPath()
-
-		if err != nil {
-			return err
-		}
-
-		args.musicPath = defaultMusicPath
-	}
-
 	if args.live {
 		return liveQueryResults(args.musicPath)
 	}
