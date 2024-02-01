@@ -20,11 +20,7 @@
 
 This is a simple command line tool to help with music-related tasks. This is
 **not** a music player. It does not provide a TUI or GUI, and it uses VLC
-internally. I am usually a fan of command line tools, and there are some
-available for music, such as ncmpcpp or cmus, but they do not meet my needs.
-I like to start up my music as quickly and precisely as possible, and I have
-created a querying system to do so. Unfortunately ncmpcpp and cmus do not
-allow you to preload music before you open the program. Here are the main features:
+internally. There are some command line tools available for music, such as ncmpcpp or cmus, but they do not allow you to launch music before you get into the TUI. Here are the main features:
 
 1. Querying music quickly and playing it (on vlc)
 2. Setting up a watch server to watch for playing music, and scrobbling it to [lastfm](https://www.last.fm/)
@@ -35,9 +31,9 @@ This program does not support piracy; you should have the rights to all your fil
 
 ## Requirements
 
--   VLC
+-   VLC (if you plan on listening to music or scrobbling)
 -   youtube-dl (if you plan on installing music)
--   playerctl (if you plan on scrobbling to lastfm)
+-   playerctl (if you plan on scrobbling to lastfm with vlc)
 
 ## Installation
 
@@ -49,12 +45,10 @@ go install github.com/kitesi/music@latest
 
 ## Usage
 
-This program works off a music directory which defaults to `$MUSIC_PATH` or `$HOME/Music`.
-Commands that consider a music path will have a `--music-path` option. I
-recommend a folder structure of:
+This program works off a music directory which defaults to `$MUSIC_PATH` or `$HOME/Music`. Commands that consider a music path will have a `--music-path` option. I recommend a folder structure of:
 
 ```text
-~/Music/
+Music/
     Artist1/
         x.mp3
         y.m4a
@@ -160,13 +154,15 @@ like, which is why I use my own personal bash completion. It can be found in
 While VLC does have built in lastfm scrobbling, I could not get it to work
 (edit: I actually got it to work, but it doesn't scrobble certain tracks and I
 kinda already built this so whatever). You can run a watch server to watch for
-playing songs every x seconds (defaulted to 10). It uses playerctl under the
-hood, so you will need to have that installed and be on linux (in the future I
-could add vlc tcp support so that non-linux users could also use). It also only
-checks for the VLC player so other media players or something like youtube will
-not be logged.
+playing songs every x seconds (defaulted to 10). It uses playerctl (MPRIS)
+under the hood, so you will need to have that installed and be on linux (in the
+future I could add vlc tcp support so that non-linux users could also use). It
+also only checks for the VLC player so other media players or something like
+youtube will not be logged. An alternative would be
+[multi-scrobbler](https://github.com/FoxxMD/multi-scrobbler) which supports a
+lot more sources, and has a lot more functionality overall.
 
-Currently, the scrobble detection is kinda poor. It follows the approach of
+Currently, the scrobble detection is kind of poor. It follows the approach of
 minimizing false positives, so if you skip/seek around, it likely won't
 scrobble. Also, if you play the same song over and over it won't scrobble more
 than once (although this will be fixed in the future).
@@ -235,9 +231,9 @@ hanging, and you won't have vlc in your notification tray.
 
 ### Configuration
 
-There is no configuration file currently. I have considered adding one, but this program is
-slow enough. I would suggest setting up an alias with your desired options.
+The configuration file is located in `<$CONFIG_DIR>/go-music-kitesi/config.json`. An example can be found in [assets/default-config.json](assets/default-config.json). `<$CONFIG_DIR>` is specified as below:
 
-Because no one besides me uses this program, a lot of the utility is centered around my workflow,
-and I skip a lot of customization options. Feel free to submit an issue if you want a feature,
-or just patch it yourself (the codebase is pretty easy to figure it).
+-   On Unix systems, it returns $XDG_CONFIG_HOME as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.config.
+-   On Darwin, it returns `$HOME/Library/Application Support`.
+-   On Windows, it returns `%AppData%`.
+-   On Plan 9, it returns `$home/lib`.
