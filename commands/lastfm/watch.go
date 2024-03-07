@@ -32,7 +32,6 @@ const (
 )
 
 func WatchSetup() *cobra.Command {
-
 	args := LastfmWatchArgs{}
 
 	lastfmCommand := &cobra.Command{

@@ -57,6 +57,21 @@ type PostScrobbleResponse struct {
 	}
 }
 
+type GetRecentTracksResponse struct {
+	RecentTracks struct {
+		Track []struct {
+			Artist struct {
+				Text string `json:"#text"`
+			}
+			Name string
+			Date struct {
+				Uts  string `json:"uts"`
+				Text string `json:"#text"`
+			}
+		}
+	}
+}
+
 // same interface for /mix /library
 type GetLastfmSuggestionsResponse struct {
 	Playlist []struct {
@@ -97,4 +112,15 @@ type LastfmSuggestArgs struct {
 	limit     int
 	musicPath string
 	format    string
+}
+
+type LastfmRecentArgs struct {
+	debug    bool
+	limit    int
+	username string
+	json     bool
+}
+
+type LastfmImportArgs struct {
+	debug bool
 }

@@ -26,6 +26,8 @@ func Execute() {
 
 	lastfmCommand.AddCommand(lastfm.WatchSetup())
 	lastfmCommand.AddCommand(lastfm.SuggestSetup())
+	lastfmCommand.AddCommand(lastfm.RecentSetup())
+	lastfmCommand.AddCommand(lastfm.ImportSetup())
 
 	rootCmd.AddGroup(&cobra.Group{
 		ID:    "generic",
