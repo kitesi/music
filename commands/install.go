@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/shlex"
 	"github.com/kitesi/music/utils"
@@ -27,9 +28,9 @@ func init() {
 	args := InstallArgs{}
 
 	installCmd := &cobra.Command{
-		Use:   "install <id> <folder>",
-		Short: "Install music from youtube id or url",
-		Args:  cobra.ExactArgs(2),
+		Use:   "install <link> [folder]",
+		Short: "Install music from youtube, spotify, or url",
+		Args:  cobra.RangeArgs(1, 2),
 		Run: func(cmd *cobra.Command, positional []string) {
 			if err := installRunner(&args, positional); err != nil {
 				log.SetFlags(0)
@@ -53,6 +54,103 @@ func init() {
 }
 
 func installRunner(args *InstallArgs, positional []string) error {
+	var err error
+	if strings.Contains(positional[0], "spotify") {
+		err = installSpotifyLink(args, positional)
+	} else {
+		if len(positional) < 2 {
+			return errors.New("folder is required for youtube links")
+		}
+
+		err = installYoutubeLink(args, positional)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	latestFile, err := findLatestFile(args.musicPath)
+
+	if err != nil {
+		return err
+	}
+
+	var input string
+	fmt.Scanln(&input)
+
+	if len(input) == 0 || strings.HasPrefix(strings.ToLower(input), "y") {
+		return nil
+	}
+
+	if !checkIfCommandExists("beet") {
+		return errors.New("beet not found")
+	}
+
+	cmd := exec.Command("beet", "import", "-gts", latestFile)
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err = cmd.Run()
+	return err
+}
+
+func installSpotifyLink(args *InstallArgs, positional []string) error {
+	if !checkIfCommandExists("spotdl") {
+		return errors.New("spotdl not found")
+	}
+
+	url := positional[0]
+	output := args.musicPath
+
+	if len(positional) > 1 {
+		if positional[1] == "random" {
+			output = filepath.Join(output, "Random", "{artist} - {title}")
+		} else {
+			output = filepath.Join(output, positional[1], "{title}")
+		}
+	} else {
+		output = filepath.Join(output, "{artist}", "{title}")
+	}
+
+	cmd := exec.Command("spotdl", "--format", args.format, "--output", output, url)
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func findLatestFile(folder string) (string, error) {
+	var latestFile string
+	var latestModTime time.Time
+
+	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			modTime := info.ModTime()
+			if modTime.After(latestModTime) {
+				latestModTime = modTime
+				latestFile = path
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return latestFile, err
+}
+
+func installYoutubeLink(args *InstallArgs, positional []string) error {
+	if !checkIfCommandExists("youtube-dl") {
+		return errors.New("youtube-dl not found")
+	}
+
 	id := positional[0]
 	folder := positional[1]
 
@@ -122,6 +220,11 @@ func installRunner(args *InstallArgs, positional []string) error {
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
+}
+
+func checkIfCommandExists(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
 }
 
 func formatFolderName(folder string, re *regexp.Regexp) string {
