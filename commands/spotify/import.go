@@ -1,7 +1,6 @@
 package spotify
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,11 +15,15 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
+	"github.com/adrg/strutil"
+	"github.com/adrg/strutil/metrics"
 	"github.com/dhowden/tag"
+	"github.com/kitesi/music/commands/tags"
+	"github.com/kitesi/music/simpleconfig"
 	"github.com/kitesi/music/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -119,7 +122,19 @@ func handleCallback(w http.ResponseWriter, r *http.Request, authCodeChan chan<- 
 	}
 
 	authCodeChan <- code
-	w.Write([]byte("You can close this tab now"))
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`<!DOCTYPE html>
+	<html>
+	<head>
+		<title>Authorization Complete</title>
+	</head>
+	<body>
+		<p>Authorization complete. This window will close automatically.</p>
+		<script type="text/javascript">
+			window.close();
+		</script>
+	</body>
+	</html>`))
 
 	go func() {
 		if err := server.Shutdown(context.Background()); err != nil {
@@ -166,127 +181,186 @@ func exchangeCodeForToken(clientId string, clientSecret string, code string) (Sp
 	return tokenResponse, nil
 }
 
-func setupOrGetCredentials(credentialsPath string) (Credentials, error) {
-	rand.Seed(time.Now().UnixNano())
-	_, err := os.Stat(credentialsPath)
+func setupOrGetCredentials(credentialsPath string) (simpleconfig.Config, error) {
+	credentials, err := simpleconfig.NewConfig(credentialsPath, []string{"access_token", "refresh_token", "client_id", "client_secret"})
 
-	var credentialsFile *os.File
-
-	if os.IsNotExist(err) {
-		credentialsFile, err = os.Create(credentialsPath)
-
-		if err != nil {
-			return Credentials{}, errors.New("Error with creating credentials file: " + err.Error())
-		}
-
-		fmt.Println("Created credentials file at " + credentialsPath)
-	} else if err != nil {
-		return Credentials{}, errors.New("Error with stating credentials file: " + err.Error())
+	if err != nil {
+		return credentials, err
 	}
 
-	if credentialsFile == nil {
-		credentialsFile, err = os.Open(credentialsPath)
+	clientId, _ := credentials.Get("client_id")
+	clientSecret, _ := credentials.Get("client_secret")
 
-		if err != nil {
-			return Credentials{}, errors.New("Error with opening credentials file: " + err.Error())
-		}
+	if clientId == "" {
+		return credentials, errors.New("No client_id found in credentials file")
 	}
 
-	var credentials Credentials
-
-	scanner := bufio.NewScanner(credentialsFile)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		switch key {
-		case "client_id":
-			credentials.ClientId = value
-		case "client_secret":
-			credentials.ClientSecret = value
-		case "access_token":
-			credentials.AccessToken = value
-		case "refresh_token":
-			credentials.RefreshToken = value
-		default:
-			return Credentials{}, errors.New("Unknown key in credentials file: " + parts[0])
-		}
+	if clientSecret == "" {
+		return credentials, errors.New("No client_secret found in credentials file")
 	}
 
-	credentialsFile.Close()
-
-	if err := scanner.Err(); err != nil {
-		return credentials, errors.New("Error with reading credentials file: " + err.Error())
-	}
-
-	if credentials.ClientId == "" {
-		return credentials, errors.New("Client id not found in credentials file")
-	}
-
-	if credentials.ClientSecret == "" {
-		return credentials, errors.New("Client secret not found in credentials file")
-	}
-
-	if credentials.AccessToken == "" {
-		authCodeChan := make(chan string)
-		state := generateRandomState(16)
-		server := &http.Server{Addr: ":8080"}
-
-		http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
-			handleCallback(w, r, authCodeChan, state, server)
-		})
-
-		go func() {
-			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("Error starting server: %v", err)
-			}
-		}()
-
-		err := openAuthTokenUrl(credentials.ClientId, credentials.ClientSecret, state)
+	if accessToken, _ := credentials.Get("access_token"); accessToken == "" {
+		authResponse, err := openServerAndGetAuthToken(clientId, clientSecret)
 
 		if err != nil {
-			return credentials, errors.New("Error getting auth token: " + err.Error())
+			return credentials, err
 		}
 
-		code := <-authCodeChan
-		authResponse, err := exchangeCodeForToken(credentials.ClientId, credentials.ClientSecret, code)
+		credentials.Set("access_token", authResponse.AccessToken)
+		credentials.Set("refresh_token", authResponse.RefreshToken)
+
+		err = credentials.WriteConfig()
 
 		if err != nil {
-			return credentials, errors.New("Error exchanging code for token: " + err.Error())
-		}
-
-		credentials.AccessToken = authResponse.AccessToken
-		credentials.RefreshToken = authResponse.RefreshToken
-		credentialsFile, err := os.OpenFile(credentialsPath, os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			return credentials, errors.New("Error with opening credentials file: " + err.Error())
-		}
-
-		_, err = credentialsFile.WriteString("\naccess_token=" + credentials.AccessToken + "\nrefresh_token=" + credentials.RefreshToken)
-		if err != nil {
-			return credentials, errors.New("Error with writing to credentials file: " + err.Error())
+			return credentials, errors.New("Error writing credentials to file: " + err.Error())
 		}
 	}
 
 	return credentials, nil
 }
 
-func updateLocalPlaylistToMatch(playlistResponse SpotifyPlaylistTracksResponse, localTagName string, args *SpotifyImportArgs) {
-	playlistSongs := playlistResponse.Items
+func normalizeString(s string) string {
+	return norm.NFC.String(strings.ToLower(s))
+}
 
-	// for i, playlistSong := range playlistSongs {
-	// 	fmt.Printf("%d: %s - %s\n", i, playlistSong.Track.Name, playlistSong.Track.Artists[0].Name)
-	// }
+func getSongId(song SpotifyTrackObject) string {
+	return song.Artists[0].Name + " - " + song.Name
+}
 
-	err := filepath.WalkDir(args.musicPath, func(path string, d os.DirEntry, err error) error {
+func testFileAgainstPlaylist(fileName string, playlistSongs *[]SpotifyTrackObject, metricCmp strutil.StringMetric, mostSimilar *map[string]SimilarityInfo, onMatch func(int, string)) error {
+	file, err := os.Open(fileName)
+
+	if err != nil {
+		return errors.New("Error opening file: " + fileName + " - " + err.Error())
+	}
+
+	defer file.Close()
+	metadata, err := tag.ReadFrom(file)
+
+	if err != nil {
+		return errors.New("Error reading metadata from file: " + fileName + " - " + err.Error())
+	}
+
+	title := normalizeString(metadata.Title())
+	artist := normalizeString(metadata.Artist())
+
+	for i, playlistSong := range *playlistSongs {
+		playlistSongName := playlistSong.Name
+		playlistSongArtist := playlistSong.Artists[0].Name
+
+		titleSimilarity := strutil.Similarity(title, playlistSongName, metricCmp)
+		artistSimilarity := strutil.Similarity(artist, playlistSongArtist, metricCmp)
+
+		if strings.Contains(playlistSongArtist, artist) || strings.Contains(artist, playlistSongArtist) {
+			artistSimilarity = 1
+		}
+
+		similarity := (titleSimilarity + artistSimilarity) / 2
+		songId := getSongId(playlistSong)
+
+		if similarity > (*mostSimilar)[songId].similarity {
+			(*mostSimilar)[songId] = SimilarityInfo{path: fileName, similarity: similarity}
+		}
+
+		if title == playlistSongName && artist == playlistSongArtist {
+			onMatch(i, fileName)
+			delete((*mostSimilar), songId)
+		}
+	}
+
+	return nil
+}
+
+func updateLocalPlaylistToMatch(playlistSongs []SpotifyTrackObject, localTagName string, args *SpotifyImportArgs) error {
+	fmt.Println("There are", len(playlistSongs), "songs in playlist")
+
+	for i, playlistSong := range playlistSongs {
+		if playlistSong.Type == "episode" {
+			fmt.Println("Skipping episode: ", playlistSong.Name)
+			playlistSongs = append(playlistSongs[:i], playlistSongs[i+1:]...)
+		} else {
+			playlistSongs[i].Name = normalizeString(playlistSong.Name)
+			playlistSongs[i].Artists[0].Name = normalizeString(playlistSong.Artists[0].Name)
+		}
+	}
+
+	tags, err := tags.GetStoredTags(args.musicPath)
+
+	if err != nil {
+		return errors.New("Error getting tags: " + err.Error())
+	}
+
+	tagSongs, ok := tags[localTagName]
+
+	if !ok {
+		fmt.Printf("Tag (%s) not found, create? (y/n): ", localTagName)
+
+		var response string
+		fmt.Scanln(&response)
+
+		if strings.ToLower(response) == "y" {
+			tagSongs = []string{}
+		} else {
+			return nil
+		}
+	}
+
+	tagSongIndex := 0
+	foundTaggedSongs := []MatchedSpotifyToLocal{}
+	mostSimilarTagged := map[string]SimilarityInfo{}
+	metricCmp := metrics.NewSorensenDice()
+
+	onTaggedMatch := func(i int, fileName string) {
+		foundTaggedSongs = append(foundTaggedSongs, MatchedSpotifyToLocal{spotify: getSongId(playlistSongs[i]), local: fileName})
+		tagSongs = append(tagSongs[:tagSongIndex], tagSongs[tagSongIndex+1:]...)
+		playlistSongs = append(playlistSongs[:i], playlistSongs[i+1:]...)
+		tagSongIndex--
+	}
+
+	for tagSongIndex < len(tagSongs) && len(playlistSongs) > 0 {
+		testFileAgainstPlaylist(tagSongs[tagSongIndex], &playlistSongs, metricCmp, &mostSimilarTagged, onTaggedMatch)
+		tagSongIndex++
+	}
+
+	if len(foundTaggedSongs) != 0 {
+		fmt.Println("\nFound", len(foundTaggedSongs), "songs from the spotify playlist that are already tagged:")
+		for _, song := range foundTaggedSongs {
+			fmt.Println("- " + song.spotify + " -> " + song.local)
+		}
+	}
+
+	if len(mostSimilarTagged) != 0 {
+		fmt.Println("\nSimilarity of playlist songs to tagged songs:")
+		for spotifySong, mostSimilar := range mostSimilarTagged {
+			if mostSimilar.similarity > 0.9 {
+				fmt.Printf("- Assuming %s -> %s (%.2f%%)\n", mostSimilar.path, spotifySong, mostSimilar.similarity*100)
+				foundTaggedSongs = append(foundTaggedSongs, MatchedSpotifyToLocal{spotify: spotifySong, local: mostSimilar.path})
+
+				j := 0
+				for j < len(playlistSongs) && getSongId(playlistSongs[j]) != spotifySong {
+					j++
+				}
+				playlistSongs = append(playlistSongs[:j], playlistSongs[j+1:]...)
+
+				j = 0
+				for j < len(tagSongs) && tagSongs[j] != mostSimilar.path {
+					j++
+				}
+				tagSongs = append(tagSongs[:j], tagSongs[j+1:]...)
+			} else {
+				fmt.Printf("- Skipping %s -> %s (%.2f%%)\n", mostSimilar.path, spotifySong, mostSimilar.similarity*100)
+			}
+		}
+	}
+
+	foundUntaggedSongs := []MatchedSpotifyToLocal{}
+	mostSimilarUntagged := map[string]SimilarityInfo{}
+	onUntaggedMatch := func(i int, fileName string) {
+		foundUntaggedSongs = append(foundUntaggedSongs, MatchedSpotifyToLocal{spotify: getSongId(playlistSongs[i]), local: fileName})
+		playlistSongs = append(playlistSongs[:i], playlistSongs[i+1:]...)
+	}
+
+	err = filepath.WalkDir(args.musicPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -301,123 +375,141 @@ func updateLocalPlaylistToMatch(playlistResponse SpotifyPlaylistTracksResponse, 
 			return nil
 		}
 
-		file, err := os.Open(path)
-
-		if err != nil {
-			fmt.Println("Error opening file: ", path)
-			return nil
-		}
-
-		defer file.Close()
-		metadata, err := tag.ReadFrom(file)
-
-		if err != nil {
-			fmt.Println("Error reading metadata from file: ", path)
-			return nil
-		}
-
-		title := strings.ToLower(metadata.Title())
-		artist := strings.ToLower(metadata.Artist())
-
-		// find if in playlist songs and remove from playlists songs if so
-		for i, playlistSong := range playlistSongs {
-			playlistSongName := strings.ToLower(playlistSong.Track.Name)
-			playlistSongArtist := strings.ToLower(playlistSong.Track.Artists[0].Name)
-
-			if title == playlistSongName && artist == playlistSongArtist {
-				playlistSongs = append(playlistSongs[:i], playlistSongs[i+1:]...)
-			}
-		}
-
+		testFileAgainstPlaylist(path, &playlistSongs, metricCmp, &mostSimilarUntagged, onUntaggedMatch)
 		return nil
 	})
 
-	for _, playlistSong := range playlistSongs {
-		fmt.Printf("Song not found in local library: %s - %s\n", playlistSong.Track.Name, playlistSong.Track.Artists[0].Name)
+	if len(foundUntaggedSongs) != 0 {
+		fmt.Println("\nFound", len(foundUntaggedSongs), "songs from the spotify playlist that are not tagged:")
+		for _, song := range foundUntaggedSongs {
+			fmt.Println("- " + song.spotify + " -> " + song.local)
+		}
 	}
 
-	if err != nil {
-		fmt.Println("Error walking path: ", err)
+	if len(mostSimilarUntagged) != 0 {
+		fmt.Println("\nSimilarity of playlist songs to untagged songs:")
+
+		for spotifySong, mostSimilar := range mostSimilarUntagged {
+			if mostSimilar.similarity > 0.9 {
+				fmt.Printf("- Assuming %s -> %s (%.2f%%)\n", mostSimilar.path, spotifySong, mostSimilar.similarity*100)
+				foundUntaggedSongs = append(foundUntaggedSongs, MatchedSpotifyToLocal{spotify: spotifySong, local: mostSimilar.path})
+
+				j := 0
+
+				for j < len(playlistSongs) && getSongId(playlistSongs[j]) != spotifySong {
+					j++
+				}
+
+				playlistSongs = append(playlistSongs[:j], playlistSongs[j+1:]...)
+			} else {
+				fmt.Printf("- Skipping %s -> %s (%.2f%%)\n", mostSimilar.path, spotifySong, mostSimilar.similarity*100)
+			}
+		}
 	}
+
+	if len(playlistSongs) != 0 {
+		fmt.Println("\nFound", len(playlistSongs), "songs from the spotify playlist that are not in the local library:")
+		for _, playlistSong := range playlistSongs {
+			fmt.Printf("- %s - %s\n", playlistSong.Artists[0].Name, playlistSong.Name)
+		}
+	}
+	if err != nil {
+		return errors.New("Error walking music path: " + err.Error())
+	}
+
+	return nil
 }
 
-func refreshToken(creds *Credentials, credsPath string) error {
-	params := url.Values{}
+func openServerAndGetAuthToken(clientId, clientSecret string) (SpotifyAuthTokenResponse, error) {
+	authCodeChan := make(chan string)
+	state := generateRandomState(16)
+	server := &http.Server{Addr: ":8080"}
 
-	params.Set("grant_type", "refresh_token")
-	params.Set("refresh_token", creds.RefreshToken)
-	params.Set("client_id", creds.ClientId)
+	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
+		handleCallback(w, r, authCodeChan, state, server)
+	})
 
-	req, err := http.NewRequest("POST", TOKEN_URL, strings.NewReader(params.Encode()))
-
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(creds.ClientId, creds.ClientSecret)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-
-	if err != nil {
-		return err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return errors.New("Invalid status code: " + resp.Status)
-	}
-
-	var tokenResponse SpotifyAuthTokenResponse
-
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
-		return err
-	}
-
-	fmt.Println(tokenResponse)
-
-	creds.AccessToken = tokenResponse.AccessToken
-	creds.RefreshToken = tokenResponse.RefreshToken
-
-	// replace access token in file
-	credentialsFile, err := os.OpenFile(credsPath, os.O_RDWR, 0644)
-
-	if err != nil {
-		return err
-	}
-
-	defer credentialsFile.Close()
-	scanner := bufio.NewScanner(credentialsFile)
-
-	var lines []string
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if strings.HasPrefix(line, "access_token=") {
-			line = "access_token=" + creds.AccessToken
-		} else if strings.HasPrefix(line, "refresh_token=") {
-			line = "refresh_token=" + creds.RefreshToken
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Error starting server: %v", err)
 		}
+	}()
 
-		lines = append(lines, line)
+	err := openAuthTokenUrl(clientId, clientSecret, state)
+
+	if err != nil {
+		return SpotifyAuthTokenResponse{}, errors.New("Error getting auth token: " + err.Error())
 	}
 
-	if err := scanner.Err(); err != nil {
-		return err
+	code := <-authCodeChan
+	authResponse, err := exchangeCodeForToken(clientId, clientSecret, code)
+
+	if err != nil {
+		return SpotifyAuthTokenResponse{}, errors.New("Error exchanging code for token: " + err.Error())
 	}
 
-	credentialsFile.Truncate(0)
-	credentialsFile.Seek(0, 0)
+	return authResponse, nil
+}
 
-	for _, line := range lines {
-		_, err := credentialsFile.WriteString(line + "\n")
+func refreshToken(creds *simpleconfig.Config, credsPath string) error {
+	clientId, _ := creds.Get("client_id")
+	clientSecret, _ := creds.Get("client_secret")
+	refreshToken, _ := creds.Get("refresh_token")
+
+	if refreshToken == "" {
+		fmt.Println("No refresh token found, re-authenticating...")
+		authResponse, err := openServerAndGetAuthToken(clientId, clientSecret)
 
 		if err != nil {
 			return err
 		}
+
+		creds.Set("access_token", authResponse.AccessToken)
+		creds.Set("refresh_token", authResponse.RefreshToken)
+	} else {
+
+		params := url.Values{}
+
+		params.Set("grant_type", "refresh_token")
+		params.Set("refresh_token", refreshToken)
+		params.Set("client_id", clientId)
+
+		req, err := http.NewRequest("POST", TOKEN_URL, strings.NewReader(params.Encode()))
+
+		if err != nil {
+			return err
+		}
+
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.SetBasicAuth(clientId, clientSecret)
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+
+		if err != nil {
+			return err
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return errors.New("Invalid status code: " + resp.Status)
+		}
+
+		var tokenResponse SpotifyAuthTokenResponse
+
+		if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
+			return err
+		}
+
+		creds.Set("access_token", tokenResponse.AccessToken)
+		creds.Set("refresh_token", tokenResponse.RefreshToken)
+	}
+
+	err := creds.WriteConfig()
+
+	if err != nil {
+		return errors.New("Error writing credentials to file: " + err.Error())
 	}
 
 	return nil
@@ -437,19 +529,28 @@ func importRunner(playlist string, tagName string, args *SpotifyImportArgs) erro
 		return err
 	}
 
-	playlistId := strings.TrimPrefix(playlist, "https://open.spotify.com/playlist/")
-	fmt.Println("playlistId: ", playlistId)
+	apiSecondParam := "playlists"
+	playlistId := playlist
+
+	if strings.HasPrefix(playlist, "https://open.spotify.com/album/") {
+		apiSecondParam = "albums"
+		playlistId = strings.TrimPrefix(playlist, "https://open.spotify.com/album/")
+	} else {
+		playlistId = strings.TrimPrefix(playlist, "https://open.spotify.com/playlist/")
+	}
 
 	params := url.Values{}
 	params.Set("limit", "50")
 
-	req, err := http.NewRequest("GET", API_BASE_URL+"/playlists/"+playlistId+"/tracks?"+params.Encode(), nil)
+	requestUrl := API_BASE_URL + "/" + apiSecondParam + "/" + playlistId + "/tracks?" + params.Encode()
+	req, err := http.NewRequest("GET", requestUrl, nil)
 
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+creds.AccessToken)
+	accessToken, _ := creds.Get("access_token")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -461,27 +562,40 @@ func importRunner(playlist string, tagName string, args *SpotifyImportArgs) erro
 		if err != nil {
 			return err
 		}
-	}
 
-	if err != nil {
+		fmt.Println("Done. Retrying now...")
+		return importRunner(playlist, tagName, args)
+	} else if err != nil {
 		return err
+	} else if resp.StatusCode != http.StatusOK {
+		return errors.New("Invalid status code: " + resp.Status)
 	}
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return errors.New("Invalid status code: " + resp.Status)
+	if apiSecondParam == "playlists" {
+		var playlistResponse SpotifyPlaylistTracksResponse
+
+		if err := json.NewDecoder(resp.Body).Decode(&playlistResponse); err != nil {
+			return err
+		}
+
+		// TODO: currently assumes there are less than 50 songs in the playlist
+
+		playlistSongs := []SpotifyTrackObject{}
+
+		for _, item := range playlistResponse.Items {
+			playlistSongs = append(playlistSongs, item.Track)
+		}
+
+		return updateLocalPlaylistToMatch(playlistSongs, tagName, args)
+	} else {
+		var albumResponse SpotifyAlbumTracksResponse
+
+		if err := json.NewDecoder(resp.Body).Decode(&albumResponse); err != nil {
+			return err
+		}
+
+		return updateLocalPlaylistToMatch(albumResponse.Items, tagName, args)
 	}
-
-	var playlistResponse SpotifyPlaylistTracksResponse
-
-	if err := json.NewDecoder(resp.Body).Decode(&playlistResponse); err != nil {
-		return err
-	}
-
-	// TODO: currently assumes there are less than 50 songs in the playlist
-
-	updateLocalPlaylistToMatch(playlistResponse, tagName, args)
-
-	return nil
 }

@@ -5,13 +5,6 @@ type SpotifyImportArgs struct {
 	musicPath string
 }
 
-type Credentials struct {
-	ClientId     string
-	ClientSecret string
-	AccessToken  string
-	RefreshToken string
-}
-
 type SpotifyAuthTokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type"`
@@ -24,6 +17,12 @@ type SpotifyPlaylistTracksResponse struct {
 	Total int                          `json:"total"`
 	Next  string                       `json:"next"`
 	Items []SpotifyPlaylistTrackObject `json:"items"`
+}
+
+type SpotifyAlbumTracksResponse struct {
+	Total int                  `json:"total"`
+	Next  string               `json:"next"`
+	Items []SpotifyTrackObject `json:"items"`
 }
 
 type SpotifyPlaylistTrackObject struct {
@@ -47,4 +46,14 @@ type SpotifyAlbumObject struct {
 type SpotifyArtistObject struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type SimilarityInfo struct {
+	path       string
+	similarity float64
+}
+
+type MatchedSpotifyToLocal struct {
+	spotify string
+	local   string
 }
