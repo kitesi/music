@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -227,6 +228,8 @@ func getSongId(song SpotifyTrackObject) string {
 	return song.Artists[0].Name + " - " + song.Name
 }
 
+var featureRegex = regexp.MustCompile(`(?i)\(?(ft\.?|feat\.?)\)?`)
+
 func testFileAgainstPlaylist(fileName string, playlistSongs *[]SpotifyTrackObject, metricCmp strutil.StringMetric, mostSimilar *map[string]SimilarityInfo, onMatch func(int, string)) error {
 	file, err := os.Open(fileName)
 
@@ -251,6 +254,17 @@ func testFileAgainstPlaylist(fileName string, playlistSongs *[]SpotifyTrackObjec
 		titleSimilarity := strutil.Similarity(title, playlistSongName, metricCmp)
 		artistSimilarity := strutil.Similarity(artist, playlistSongArtist, metricCmp)
 
+		// handle "ft" in artist name or song title, usually spotify has it in
+		// the title rather than a sep artist as exif does
+		if featureRegex.MatchString(playlistSongName) {
+			parts := featureRegex.Split(playlistSongName, -1)
+			featuring := strings.TrimSuffix(strings.TrimSpace(parts[1]), ")")
+
+			if strings.Contains(artist, featuring) {
+				playlistSongName = strings.TrimSpace(parts[0])
+			}
+		}
+
 		if strings.Contains(playlistSongArtist, artist) || strings.Contains(artist, playlistSongArtist) {
 			artistSimilarity = 1
 		}
@@ -262,7 +276,7 @@ func testFileAgainstPlaylist(fileName string, playlistSongs *[]SpotifyTrackObjec
 			(*mostSimilar)[songId] = SimilarityInfo{path: fileName, similarity: similarity}
 		}
 
-		if title == playlistSongName && artist == playlistSongArtist {
+		if title == playlistSongName && (artist == playlistSongArtist || artistSimilarity == 1) {
 			onMatch(i, fileName)
 			delete((*mostSimilar), songId)
 		}
@@ -308,7 +322,7 @@ func updateLocalPlaylistToMatch(playlistSongs []SpotifyTrackObject, localTagName
 	tagSongIndex := 0
 	foundTaggedSongs := []MatchedSpotifyToLocal{}
 	mostSimilarTagged := map[string]SimilarityInfo{}
-	metricCmp := metrics.NewSorensenDice()
+	metricCmp := metrics.NewLevenshtein()
 
 	onTaggedMatch := func(i int, fileName string) {
 		foundTaggedSongs = append(foundTaggedSongs, MatchedSpotifyToLocal{spotify: getSongId(playlistSongs[i]), local: fileName})
@@ -340,13 +354,17 @@ func updateLocalPlaylistToMatch(playlistSongs []SpotifyTrackObject, localTagName
 				for j < len(playlistSongs) && getSongId(playlistSongs[j]) != spotifySong {
 					j++
 				}
-				playlistSongs = append(playlistSongs[:j], playlistSongs[j+1:]...)
+				if getSongId(playlistSongs[j]) == spotifySong {
+					playlistSongs = append(playlistSongs[:j], playlistSongs[j+1:]...)
+				}
 
 				j = 0
 				for j < len(tagSongs) && tagSongs[j] != mostSimilar.path {
 					j++
 				}
-				tagSongs = append(tagSongs[:j], tagSongs[j+1:]...)
+				if tagSongs[j] == mostSimilar.path {
+					tagSongs = append(tagSongs[:j], tagSongs[j+1:]...)
+				}
 			} else {
 				fmt.Printf("- Skipping %s -> %s (%.2f%%)\n", mostSimilar.path, spotifySong, mostSimilar.similarity*100)
 			}
