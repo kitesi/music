@@ -50,12 +50,21 @@ func recentRunner(args *LastfmRecentArgs) error {
 		return err
 	}
 
+	username, ok := credentials.Get("username")
+
+	if args.username == "" && !ok {
+		return fmt.Errorf("username is required - not provided in config or as a flag")
+	}
+
+	apiKey, _ := credentials.Get("api_key")
+	apiSecret, _ := credentials.Get("api_secret")
+
 	params := url.Values{}
 	params.Set("method", "user.getRecentTracks")
-	params.Set("user", credentials.Username)
-	params.Set("api_key", credentials.ApiKey)
+	params.Set("user", username)
+	params.Set("api_key", apiKey)
 	params.Set("limit", fmt.Sprint(args.limit))
-	params.Set("api_sig", generateSignature(params, credentials.ApiSecret))
+	params.Set("api_sig", generateSignature(params, apiSecret))
 	params.Set("format", "json")
 
 	resp, err := http.PostForm(API_END_POINT, params)

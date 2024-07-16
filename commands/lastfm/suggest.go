@@ -70,20 +70,21 @@ func installSong(args *LastfmSuggestArgs, link string, artist string, title stri
 func suggestRunner(args *LastfmSuggestArgs, username string) error {
 	if username == "" {
 		credentials, err := setupOrGetCredentials()
+		configUsername, _ := credentials.Get("username")
 
 		if err != nil {
-			if credentials.Username != "" {
+			if configUsername != "" {
 				fmt.Printf("Recieved error, but ignoring as I have a username: %s\n", err.Error())
 			} else {
 				return errors.New("Could not find a username in credentials file, and none was provided. Credentials error: " + err.Error())
 			}
 		}
 
-		if credentials.Username == "" {
+		if configUsername == "" {
 			return errors.New("Could not find a username in credentials file, and none was provided")
 		}
 
-		username = credentials.Username
+		username = configUsername
 	}
 
 	resp, err := http.Get(fmt.Sprintf(SUGGEST_API_END_POINT, username))

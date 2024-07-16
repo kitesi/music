@@ -1,7 +1,6 @@
 package lastfm
 
 import (
-	"bufio"
 	"crypto/md5"
 	"syscall"
 
@@ -22,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	// import Config from here as SimpleConfig
+	"github.com/kitesi/music/simpleconfig"
 	"github.com/kitesi/music/utils"
 	"github.com/spf13/cobra"
 )
@@ -168,15 +169,19 @@ func getSession(apiKey string, apiSecret string, token string) (Session, error) 
 	return resultJson.Session, nil
 }
 
-func scrobble(credentials Credentials, artist string, track string, timestamp int64) (PostScrobbleResponse, error) {
+func scrobble(credentials simpleconfig.Config, artist string, track string, timestamp int64) (PostScrobbleResponse, error) {
+	apiKey, _ := credentials.Get("api_key")
+	apiSecret, _ := credentials.Get("api_secret")
+	sessionKey, _ := credentials.Get("session_key")
+
 	params := url.Values{}
 	params.Set("method", "track.scrobble")
-	params.Set("api_key", credentials.ApiKey)
+	params.Set("api_key", apiKey)
 	params.Set("artist", artist)
 	params.Set("track", track)
 	params.Set("timestamp", fmt.Sprint(timestamp))
-	params.Set("sk", credentials.SessionKey)
-	params.Set("api_sig", generateSignature(params, credentials.ApiSecret))
+	params.Set("sk", sessionKey)
+	params.Set("api_sig", generateSignature(params, apiSecret))
 	params.Set("format", "json")
 
 	resp, err := http.PostForm(API_END_POINT, params)
@@ -211,88 +216,36 @@ func open(url string) error {
 	return exec.Command("xdg-open", url).Run()
 }
 
-func setupOrGetCredentials() (Credentials, error) {
+func setupOrGetCredentials() (simpleconfig.Config, error) {
 	cacheDir, err := os.UserCacheDir()
+	credentialsPath := path.Join(cacheDir, ".lastfm-credentials")
+	credentials, err := simpleconfig.NewConfig(credentialsPath, []string{"api_key", "api_secret", "session_key", "username"})
 
 	if err != nil {
-		return Credentials{}, errors.New("Could not get cache directory: " + err.Error())
+		return credentials, err
 	}
 
-	credentialsPath := path.Join(cacheDir, ".lastfm-credentials")
-	_, err = os.Stat(credentialsPath)
+	apiKey, _ := credentials.Get("api_key")
+	apiSecret, _ := credentials.Get("api_secret")
+	sessionKey, _ := credentials.Get("session_key")
 
-	var credentialsFile *os.File
-
-	if os.IsNotExist(err) {
-		credentialsFile, err = os.Create(credentialsPath)
-
-		if err != nil {
-			return Credentials{}, errors.New("Error with creating credentials file: " + err.Error())
-		}
-	} else if err != nil {
-		return Credentials{}, errors.New("Error with stating credentials file: " + err.Error())
-	}
-
-	if credentialsFile == nil {
-		credentialsFile, err = os.Open(credentialsPath)
-
-		if err != nil {
-			return Credentials{}, errors.New("Error with opening credentials file: " + err.Error())
-		}
-	}
-
-	var credentials Credentials
-
-	scanner := bufio.NewScanner(credentialsFile)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		switch key {
-		case "api_key":
-			credentials.ApiKey = value
-		case "api_secret":
-			credentials.ApiSecret = value
-		case "session_key":
-			credentials.SessionKey = value
-		case "username":
-			credentials.Username = value
-		default:
-			return Credentials{}, errors.New("Unknown key in credentials file: " + parts[0])
-		}
-	}
-
-	credentialsFile.Close()
-
-	if err := scanner.Err(); err != nil {
-		return credentials, errors.New("Error with reading credentials file: " + err.Error())
-	}
-
-	if credentials.ApiKey == "" {
+	if apiKey == "" {
 		return credentials, errors.New("API key not found in credentials file")
 	}
 
-	if credentials.ApiSecret == "" {
+	if apiSecret == "" {
 		return credentials, errors.New("API secret not found in credentials file")
 	}
 
-	if credentials.SessionKey == "" {
-		authToken, err := getAuthToken(credentials.ApiKey, credentials.ApiSecret)
+	if sessionKey == "" {
+		authToken, err := getAuthToken(apiKey, apiSecret)
 
 		if err != nil {
 			return credentials, errors.New("Error getting auth token: " + err.Error())
 		}
 
 		fmt.Println("Attempting to open up in browser...")
-		err = open("http://www.last.fm/api/auth/?api_key=" + credentials.ApiKey + "&token=" + authToken)
+		err = open("http://www.last.fm/api/auth/?api_key=" + apiKey + "&token=" + authToken)
 
 		if err != nil {
 			return credentials, errors.New("Error opening browser: " + err.Error())
@@ -301,24 +254,19 @@ func setupOrGetCredentials() (Credentials, error) {
 		fmt.Println("Press enter when you have accepted...")
 		fmt.Scanln()
 
-		session, err := getSession(credentials.ApiKey, credentials.ApiSecret, authToken)
+		session, err := getSession(apiKey, apiSecret, authToken)
 
 		if err != nil {
 			return credentials, errors.New("Error getting session key: " + err.Error())
 		}
 
-		credentials.SessionKey = session.Key
-		credentials.Username = session.Name
-		credentialsFile, err := os.OpenFile(credentialsPath, os.O_APPEND|os.O_WRONLY, 0644)
+		credentials.Set("session_key", session.Key)
+		credentials.Set("username", session.Name)
+
+		err = credentials.WriteConfig()
 
 		if err != nil {
-			return credentials, errors.New("Error with opening credentials file: " + err.Error())
-		}
-
-		_, err = credentialsFile.WriteString("\nsession_key=" + credentials.SessionKey + "\nusername=" + credentials.Username)
-
-		if err != nil {
-			return credentials, errors.New("Error with writing to credentials file: " + err.Error())
+			return credentials, errors.New("Error writing credentials file: " + err.Error())
 		}
 	}
 
@@ -342,7 +290,7 @@ func getCurrentPosition() (float64, error) {
 	return position, nil
 }
 
-func attemptScrobble(credentials Credentials, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, currentPosition float64, stdOut *log.Logger, stdErr *log.Logger) {
+func attemptScrobble(credentials simpleconfig.Config, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, currentPosition float64, stdOut *log.Logger, stdErr *log.Logger) {
 	paddedLastPosition := currentTrack.LastPosition + float64(args.interval) - currentPosition
 	timeConditionPassed := -1.0
 
@@ -383,7 +331,7 @@ func attemptScrobble(credentials Credentials, currentTrack *CurrentTrackInfo, ar
 	}
 }
 
-func watchForTracks(credentials Credentials, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, stdOut *log.Logger, stdErr *log.Logger) {
+func watchForTracks(credentials simpleconfig.Config, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, stdOut *log.Logger, stdErr *log.Logger) {
 	waitTime := time.Duration(args.interval) * time.Second
 
 	for {

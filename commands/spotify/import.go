@@ -298,13 +298,13 @@ func updateLocalPlaylistToMatch(playlistSongs []SpotifyTrackObject, localTagName
 		}
 	}
 
-	tags, err := tags.GetStoredTags(args.musicPath)
+	storedTags, err := tags.GetStoredTags(args.musicPath)
 
 	if err != nil {
 		return errors.New("Error getting tags: " + err.Error())
 	}
 
-	tagSongs, ok := tags[localTagName]
+	tagSongs, ok := storedTags[localTagName]
 
 	if !ok {
 		fmt.Printf("Tag (%s) not found, create? (y/n): ", localTagName)
@@ -426,13 +426,39 @@ func updateLocalPlaylistToMatch(playlistSongs []SpotifyTrackObject, localTagName
 	}
 
 	if len(playlistSongs) != 0 {
-		fmt.Println("\nFound", len(playlistSongs), "songs from the spotify playlist that are not in the local library:")
+		fmt.Println("\nCould not find", len(playlistSongs), "songs from the spotify playlist in the local library:")
+
 		for _, playlistSong := range playlistSongs {
 			fmt.Printf("- %s - %s\n", playlistSong.Artists[0].Name, playlistSong.Name)
 		}
 	}
+
+	if len(tagSongs) != 0 {
+		fmt.Println("\nCould not find", len(tagSongs), "songs that are tagged in the spotify playlist:")
+
+		for _, tagSong := range tagSongs {
+
+			fmt.Println("- " + tagSong)
+		}
+	}
+
 	if err != nil {
 		return errors.New("Error walking music path: " + err.Error())
+	}
+
+	toAppend := []string{}
+
+	for _, song := range foundUntaggedSongs {
+		toAppend = append(toAppend, song.local)
+	}
+
+	if len(toAppend) != 0 {
+		fmt.Println("\nAdding", len(toAppend), "songs to tag:", localTagName)
+		err := tags.ChangeSongsInTag(args.musicPath, localTagName, toAppend, true)
+
+		if err != nil {
+			return errors.New("Error changing songs in tag: " + err.Error())
+		}
 	}
 
 	return nil

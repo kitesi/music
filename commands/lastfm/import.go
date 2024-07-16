@@ -60,10 +60,14 @@ func importRunner(file string, args *LastfmImportArgs) error {
 		return err
 	}
 
+	apiKey, _ := credentials.Get("api_key")
+	apiSecret, _ := credentials.Get("api_secret")
+	sessionKey, _ := credentials.Get("session_key")
+
 	params := url.Values{}
 	params.Set("method", "track.scrobble")
-	params.Set("api_key", credentials.ApiKey)
-	params.Set("sk", credentials.SessionKey)
+	params.Set("api_key", apiKey)
+	params.Set("sk", sessionKey)
 
 	for i, track := range resultJson.RecentTracks.Track {
 		params.Set(fmt.Sprintf("artist[%d]", i), track.Artist.Text)
@@ -71,7 +75,7 @@ func importRunner(file string, args *LastfmImportArgs) error {
 		params.Set(fmt.Sprintf("timestamp[%d]", i), track.Date.Uts)
 	}
 
-	params.Set("api_sig", generateSignature(params, credentials.ApiSecret))
+	params.Set("api_sig", generateSignature(params, apiSecret))
 	params.Set("format", "json")
 
 	resp, err := http.PostForm(API_END_POINT, params)

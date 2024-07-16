@@ -1,12 +1,5 @@
 package lastfm
 
-type Credentials struct {
-	ApiKey     string
-	ApiSecret  string
-	SessionKey string
-	Username   string
-}
-
 type Session struct {
 	Name       string
 	Key        string
