@@ -233,21 +233,11 @@ func ChangeSongsInTag(musicPath string, tagName string, songs []string, shouldAp
 	tagContent := []string{}
 	tagSongs, ok := storedTags[tagName]
 
-	if !ok || !shouldAppend {
-		tagSongs = utils.FilterEmptyStrings(songs)
-	} else {
-		for _, song := range songs {
-			if song != "" && !utils.Includes(tagSongs, song) {
-				tagSongs = append(tagSongs, song)
-			}
-		}
-	}
-
 	if shouldAppend {
 		_, err := os.Stat(tagPath)
 
 		if os.IsNotExist(err) {
-			tagContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)}
+			tagContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s", tagName)}
 		} else if err != nil {
 			return fmt.Errorf("could not get tag file: %w", err)
 		} else {
@@ -260,11 +250,16 @@ func ChangeSongsInTag(musicPath string, tagName string, songs []string, shouldAp
 			tagContent = []string{string(c)}
 		}
 	} else {
-		tagContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s\n", tagName)}
+		tagContent = []string{fmt.Sprintf("#EXTM3U\n#PLAYLIST:%s", tagName)}
+		tagSongs = []string{}
 	}
 
-	for _, song := range tagSongs {
-		if song != "" {
+	if !ok || tagSongs == nil {
+		tagSongs = []string{}
+	}
+
+	for _, song := range songs {
+		if song != "" && !utils.Includes(tagSongs, song) {
 			relativePath, err := filepath.Rel(filepath.Join(musicPath, "tags"), song)
 
 			if err != nil {
@@ -272,11 +267,12 @@ func ChangeSongsInTag(musicPath string, tagName string, songs []string, shouldAp
 				continue
 			}
 
-			tagContent = append(tagContent, fmt.Sprintf("%s\n", relativePath))
+			tagContent = append(tagContent, relativePath)
+			tagSongs = append(tagSongs, song)
 		}
 	}
 
-	err = os.WriteFile(tagPath, []byte(strings.Join(tagContent, "")), 0666)
+	err = os.WriteFile(tagPath, []byte(strings.Join(tagContent, "\n")), 0666)
 
 	if err != nil {
 		return fmt.Errorf("could not write tag file: %w", err)
