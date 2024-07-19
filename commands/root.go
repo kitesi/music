@@ -38,6 +38,7 @@ func Execute() {
 	lastfmCommand.AddCommand(lastfm.ImportSetup())
 
 	spotifyCommand.AddCommand(spotify.ImportSetup())
+	spotifyCommand.AddCommand(spotify.SetOriginSetup())
 
 	rootCmd.AddGroup(&cobra.Group{
 		ID:    "generic",

@@ -9,7 +9,7 @@
     -   [Querying & Playing Music](#querying---playing-music)
     -   [Live Results](#live-results)
     -   [Tags](#tags)
-    -   [Installing music](#installing-music)
+    -   [Spotify Integration](#spotify-integration)
     -   [Auto Completion](#auto-completion)
     -   [Lastfm Scrobbling](#lastfm-scrobbling)
     -   [Lastfm Suggestions](#lastfm-suggestions)
@@ -24,15 +24,13 @@ internally. There are some command line tools available for music, such as ncmpc
 
 1. Querying music quickly and playing it (on vlc)
 2. Setting up a watch server to watch for playing music, and scrobbling it to [lastfm](https://www.last.fm/)
-3. Tagging system for playlists and grouping of songs (stored in `$MUSIC_PATH/tags`)
-4. Installing music (although very limited)
+3. Tagging system for playlists and grouping of songs (stored in `$MUSIC_PATH/tags`) and having sync ability with spotify
 
 This program does not support piracy; you should have the rights to all your files.
 
 ## Requirements
 
 -   VLC (if you plan on listening to music or scrobbling)
--   youtube-dl (if you plan on installing music)
 -   playerctl (if you plan on scrobbling to lastfm with vlc)
 
 ## Installation
@@ -123,16 +121,57 @@ The intended way to add songs to a tag is to query the songs with `music play`
 and then using `--add-to-tag | -a <tag>` or `--set-to-tag | -s <tag>`. If you
 need to query but don't want to actually play the songs you can add `--dry-run`.
 
-### Installing music
+### Spotify Integration
 
-`music install "https://www.youtube.com/watch?v=K4DyBUG242c" ncs` => download from youtube
+You can also sync Spotify playlists and albums with local tags. To get started first
+create a Spotify developer account and make an application. Then create a file ".music-spotify-credentials" in your cache directory.
 
-The first positional argument is the link to download or a youtube video id. The
-second is the child folder name of your music path to download to. The folder
-name can be pretty loose in comparison to the real name. It's case-insensitive
-and replaces spaces with dashes (-).
+Your cache directory is determined by Go below:
 
-For example, if you had a folder named "Kite Hughes", you would use "kite-hughes".
+-   On Unix systems, it returns `$XDG_CACHE_HOME` as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.cache.
+-   On Darwin, it returns `$HOME/Library/Caches`
+-   On Windows, it returns `%LocalAppData%`
+-   On Plan 9, it returns `$home/lib/cache`
+
+In your new file you should store your client_id and client_secret:
+
+```
+client_id=xxxxxx
+client_secret=yyyyyy
+```
+
+Now you can just run `music spotify import <tag> [playlist]` like so:
+
+```bash
+# Spotify user playlist
+music spotify import https://open.spotify.com/playlist/hjklajskdlfj my-tag
+# Spotify artist album
+music spotify import https://open.spotify.com/album/3I2KkX13lHXuYqfBjSOopo mitski-creek
+```
+
+This will try to find all the songs in the given playlist/album, try to match
+it with songs from your local library, and tag them if they aren't already
+tagged with the provided tag. How it matches songs is through metadata rather
+than filenames.
+
+If you have a tag you want to associate with an album you can set a relationship like so:
+
+```bash
+music spotify set-origin my-tag https://open.spotify.com/playlist/hjklajskdlfj
+```
+
+Now you can just run the import command without specifying the url:
+
+```bash
+music spotify import my-tag
+```
+
+To delete a relationship between a tag and a Spotify playlist you can just run the same
+command without a second argument:
+
+```bash
+music spotify set-origin my-tag
+```
 
 ### Auto Completion
 
@@ -172,13 +211,7 @@ Lastly, it follows the [lastfm standards](https://www.last.fm/api/scrobbling):
 1.  The track must be longer than 30 seconds.
 2.  The track has been played for at least half its duration, or for 4 minutes (whichever occurs earlier.)
 
-To get started first make an api account and application on [last.fm](https://www.last.fm/api/account/create). You then need to create a file (".lastfm-credentials") in your cache directory. Your cache directory is determined by Go below:
-
--   On Unix systems, it returns `$XDG_CACHE_HOME` as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.cache.
--   On Darwin, it returns `$HOME/Library/Caches`
--   On Windows, it returns `%LocalAppData%`
--   On Plan 9, it returns `$home/lib/cache`
-
+To get started first make an api account and application on [last.fm](https://www.last.fm/api/account/create). You then need to create a file (".lastfm-credentials") in your cache directory.
 In that file you should store your api_key and your api_secret:
 
 ```

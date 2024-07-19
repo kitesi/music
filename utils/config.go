@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 )
@@ -23,9 +24,10 @@ type LastfmConfig struct {
 }
 
 type Config struct {
-	MusicPath string
-	Debug     bool
-	LastFm    LastfmConfig
+	MusicPath               string
+	Debug                   bool
+	LastFm                  LastfmConfig
+	TagPlaylistAssociations map[string]string
 }
 
 func GetConfigPath() (string, error) {
@@ -84,4 +86,35 @@ func GetConfig() (Config, error) {
 	}
 
 	return config, nil
+}
+
+func WriteConfig(config Config) error {
+	configPath, err := GetConfigPath()
+
+	if err != nil {
+		return errors.Wrap(err, "could not find config path")
+	}
+
+	err = os.MkdirAll(filepath.Dir(configPath), os.ModePerm)
+
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("could not create parent directories for config path (%s)", configPath))
+	}
+
+	f, err := os.Create(configPath)
+
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("could not open config path (%s)", configPath))
+	}
+
+	defer f.Close()
+
+	encoder := json.NewEncoder(f)
+	err = encoder.Encode(config)
+
+	if err != nil {
+		return errors.Wrap(err, "could not write config file")
+	}
+
+	return nil
 }

@@ -36,13 +36,18 @@ const (
 
 func ImportSetup() *cobra.Command {
 	args := SpotifyImportArgs{}
+	config, err := utils.GetConfig()
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %+v\n", err)
+	}
 
 	spotifyCommand := &cobra.Command{
-		Use:   "import <playlist> <tag>",
+		Use:   "import <tag> [playlist]",
 		Short: "import a spotify playlist to a tag",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.RangeArgs(1, 2),
 		Run: func(cmd *cobra.Command, positional []string) {
-			if err := importRunner(positional[0], positional[1], &args); err != nil {
+			if err := importRunner(positional, &args, config); err != nil {
 				if args.debug {
 					fmt.Fprintf(os.Stderr, "error: %+v\n", err)
 				} else {
@@ -50,12 +55,6 @@ func ImportSetup() *cobra.Command {
 				}
 			}
 		},
-	}
-
-	config, err := utils.GetConfig()
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %+v\n", err)
 	}
 
 	spotifyCommand.Flags().BoolVarP(&args.debug, "debug", "d", config.Debug, "set debug mode")
@@ -559,7 +558,16 @@ func refreshToken(creds *simpleconfig.Config, credsPath string) error {
 	return nil
 }
 
-func importRunner(playlist string, tagName string, args *SpotifyImportArgs) error {
+func importRunner(positional []string, args *SpotifyImportArgs, config utils.Config) error {
+	tagName := positional[0]
+	playlist := config.TagPlaylistAssociations[tagName]
+
+	if len(positional) == 2 {
+		playlist = positional[1]
+	} else if playlist == "" {
+		return errors.New("No playlist associated with tag: " + tagName + ". Please provide a playlist URL")
+	}
+
 	cacheDir, err := os.UserCacheDir()
 
 	if err != nil {
@@ -608,7 +616,7 @@ func importRunner(playlist string, tagName string, args *SpotifyImportArgs) erro
 		}
 
 		fmt.Println("Done. Retrying now...")
-		return importRunner(playlist, tagName, args)
+		return importRunner(positional, args, config)
 	} else if err != nil {
 		return err
 	} else if resp.StatusCode != http.StatusOK {
