@@ -116,4 +116,6 @@ type LastfmRecentArgs struct {
 
 type LastfmImportArgs struct {
 	debug bool
+	json  bool
+	text  bool
 }

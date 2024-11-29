@@ -189,12 +189,14 @@ func tagsCommandRunner(args *TagsCommandArgs, positional []string) error {
 
 		if args.edit {
 			tagPath := GetTagPath(args.musicPath, requestedTagName)
-			err := os.WriteFile(tagPath, []byte("#EXTM3U\n#PLAYLIST:"+requestedTagName+"\n"), 0666)
 
-			if err != nil {
-				return fmt.Errorf("could not write tag file: %w", err)
+			if !ok {
+				err := os.WriteFile(tagPath, []byte("#EXTM3U\n#PLAYLIST:"+requestedTagName+"\n"), 0666)
+
+				if err != nil {
+					return fmt.Errorf("could not write tag file: %w", err)
+				}
 			}
-
 			_, err = utils.EditFile(tagPath)
 
 			if err != nil {
