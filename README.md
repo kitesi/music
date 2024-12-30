@@ -2,6 +2,8 @@
 <!-- get inspo from https://github.com/Ladbaby/lastfm-scrobbler -->
 <!-- no inspo but alt https://github.com/YodaEmbedding/scrobblez -->
 <!-- no inspo but alt https://github.com/InputUsername/rescrobbled -->
+<!-- https://github.com/ahmagdy/lyricsify?tab=readme-ov-file -->
+<!-- https://github.com/SwagLyrics/SwagLyrics-For-Spotify/tree/master -->
 
 # Music CLI
 

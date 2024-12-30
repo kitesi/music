@@ -574,7 +574,7 @@ func importRunner(positional []string, args *SpotifyImportArgs, config utils.Con
 		return errors.New("Error getting cache dir: " + err.Error())
 	}
 
-	credentialsPath := path.Join(cacheDir, ".music-spotify-credentials")
+	credentialsPath := path.Join(cacheDir, utils.SPOTIFY_CREDENTIALS_FILE)
 	creds, err := setupOrGetCredentials(credentialsPath)
 
 	if err != nil {

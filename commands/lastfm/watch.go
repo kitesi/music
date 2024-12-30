@@ -218,7 +218,12 @@ func open(url string) error {
 
 func setupOrGetCredentials() (simpleconfig.Config, error) {
 	cacheDir, err := os.UserCacheDir()
-	credentialsPath := path.Join(cacheDir, ".lastfm-credentials")
+
+	if err != nil {
+		return simpleconfig.Config{}, errors.New("could not get cache directory")
+	}
+
+	credentialsPath := path.Join(cacheDir, utils.LASTFM_CREDENTIALS_FILE)
 	credentials, err := simpleconfig.NewConfig(credentialsPath, []string{"api_key", "api_secret", "session_key", "username"})
 
 	if err != nil {
@@ -349,41 +354,16 @@ func watchForTracks(credentials simpleconfig.Config, currentTrack *CurrentTrackI
 			continue
 		}
 
-		metadataCmd := exec.Command("playerctl", "-p", "vlc", "metadata")
-		metadataOutput, err := metadataCmd.Output()
+		songMetadata, err := utils.GetCurrentPlayingSong()
 
 		if err != nil {
-			stdErr.Println("playerctl - could not get metadata")
+			stdErr.Println(err)
 			time.Sleep(waitTime)
 			continue
 		}
 
-		metadata := make(map[string]string)
-
-		for _, line := range strings.Split(string(metadataOutput), "\n") {
-			if strings.TrimSpace(line) == "" {
-				continue
-			}
-
-			// split by whitespace
-			sections := strings.Fields(line)
-
-			if len(sections) < 3 {
-				continue
-			}
-
-			_, key, value := sections[0], sections[1], strings.Join(sections[2:], " ")
-			metadata[key] = value
-		}
-
-		if metadata["xesam:artist"] == "" || metadata["xesam:title"] == "" || metadata["vlc:length"] == "" {
-			stdErr.Println("playerctl - could get metadata but not the necessary fields")
-			time.Sleep(waitTime)
-			continue
-		}
-
-		artist := metadata["xesam:artist"]
-		track := metadata["xesam:title"]
+		artist := songMetadata.Artist
+		track := songMetadata.Track
 
 		if ((artist != currentTrack.Artist || track != currentTrack.Track) || position < currentTrack.LastPosition) && currentTrack.Track != "" && currentTrack.Length != -1.0 {
 			attemptScrobble(credentials, currentTrack, args, position, stdOut, stdErr)
@@ -396,7 +376,7 @@ func watchForTracks(credentials simpleconfig.Config, currentTrack *CurrentTrackI
 			currentTrack.StartTime = time.Now().Unix()
 
 			stdOut.Printf("new song detected - %s - %s", artist, track)
-			length, err := strconv.ParseFloat(metadata["vlc:time"], 64)
+			length, err := strconv.ParseFloat(songMetadata.Length, 64)
 
 			if err != nil {
 				stdErr.Printf("└── playerctl - could not parse length of")

@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+const (
+	LASTFM_CREDENTIALS_FILE  = ".lastfm-credentials"
+	SPOTIFY_CREDENTIALS_FILE = ".spotify-credentials"
+)
+
 func GetDefaultMusicPath() (string, error) {
 	envMusicPath, _ := os.LookupEnv("MUSIC_PATH")
 

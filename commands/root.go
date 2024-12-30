@@ -29,6 +29,7 @@ func Execute() {
 
 	rootCmd.AddCommand(play.Setup())
 	rootCmd.AddCommand(tags.Setup())
+	// rootCmd.AddCommand(lyrics.Setup())
 	rootCmd.AddCommand(lastfmCommand)
 	rootCmd.AddCommand(spotifyCommand)
 
