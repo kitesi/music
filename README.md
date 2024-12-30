@@ -1,3 +1,8 @@
+<!-- TODO -->
+<!-- get inspo from https://github.com/Ladbaby/lastfm-scrobbler -->
+<!-- no inspo but alt https://github.com/YodaEmbedding/scrobblez -->
+<!-- no inspo but alt https://github.com/InputUsername/rescrobbled -->
+
 # Music CLI
 
 ![Demo of the Query Functionality](./assets/query-demo.gif)
