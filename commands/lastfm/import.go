@@ -17,6 +17,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const MAX_SCROBBLES = 50
+
 func ImportSetup() *cobra.Command {
 	args := LastfmImportArgs{}
 
@@ -47,21 +49,24 @@ func ImportSetup() *cobra.Command {
 	return lastfmCommand
 }
 
-func importJsonFile(fileContents []byte, params *url.Values) (int, error) {
+func importJsonFile(fileContents []byte) ([]PossibleRedoScrobble, error) {
 	var resultJson GetRecentTracksResponse
 	err := json.Unmarshal(fileContents, &resultJson)
+	songsToScrobble := []PossibleRedoScrobble{}
 
 	if err != nil {
-		return 0, err
+		return songsToScrobble, err
 	}
 
-	for i, track := range resultJson.RecentTracks.Track {
-		params.Set(fmt.Sprintf("artist[%d]", i), track.Artist.Text)
-		params.Set(fmt.Sprintf("track[%d]", i), track.Name)
-		params.Set(fmt.Sprintf("timestamp[%d]", i), track.Date.Uts)
+	for _, track := range resultJson.RecentTracks.Track {
+		songsToScrobble = append(songsToScrobble, PossibleRedoScrobble{
+			Artist: track.Artist.Text,
+			Track:  track.Name,
+			Time:   fmt.Sprintf("%d", track.Date.Uts),
+		})
 	}
 
-	return len(resultJson.RecentTracks.Track), nil
+	return songsToScrobble, nil
 }
 
 /*
@@ -92,7 +97,7 @@ type PossibleRedoScrobble struct {
 	Time   string
 }
 
-func importTextFile(fileContents []byte, params *url.Values) ([]PossibleRedoScrobble, error) {
+func importTextFile(fileContents []byte) ([]PossibleRedoScrobble, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(fileContents))
 	songsToScrobble := []PossibleRedoScrobble{}
 	captureRegex := regexp.MustCompile(`info : (.+) (.+) new song detected - (.+) - (.+)`)
@@ -137,9 +142,9 @@ func importTextFile(fileContents []byte, params *url.Values) ([]PossibleRedoScro
 
 func importRunner(file string, args *LastfmImportArgs) error {
 	if args.json && args.text {
-		return fmt.Errorf("only one of -j or -t can be used")
+		return fmt.Errorf("only one of --json/-j or --text/-t can be used")
 	} else if !args.json && !args.text {
-		return fmt.Errorf("one of -j or -t must be used")
+		return fmt.Errorf("one of --json/-t or --text/-t must be used")
 	}
 
 	credentials, err := setupOrGetCredentials()
@@ -159,30 +164,41 @@ func importRunner(file string, args *LastfmImportArgs) error {
 	apiSecret, _ := credentials.Get("api_secret")
 	sessionKey, _ := credentials.Get("session_key")
 
-	params := url.Values{}
-	params.Set("method", "track.scrobble")
-	params.Set("api_key", apiKey)
-	params.Set("sk", sessionKey)
-
-	amountOfScrobbles := 0
+	var todo []PossibleRedoScrobble
 
 	if args.json {
-		amountOfScrobbles, err = importJsonFile(fileContents, &params)
-
-		if err != nil {
-			return err
-		}
+		todo, err = importJsonFile(fileContents)
 	} else {
-		todo, err := importTextFile(fileContents, &params)
+		todo, err = importTextFile(fileContents)
+	}
 
-		if err != nil {
-			return err
+	if err != nil {
+		return err
+	}
+
+	cursor := 0
+
+	if len(todo) > MAX_SCROBBLES {
+		fmt.Printf("There are more than %d songs to scrobble. This program will scrobble %d songs at a time.\n", MAX_SCROBBLES, MAX_SCROBBLES)
+	}
+
+	// todo: add total sucessful and stuff
+	for cursor < len(todo) {
+		endPosition := cursor + MAX_SCROBBLES
+
+		if endPosition > len(todo) {
+			endPosition = len(todo)
 		}
 
-		// ask for confirmation
-		fmt.Println("The following songs will be scrobbled:")
+		amountOfScrobbles := endPosition - cursor
+		fmt.Printf("The following songs will be scrobbled (%d):\n", amountOfScrobbles)
 
-		for i, song := range todo {
+		params := url.Values{}
+		params.Set("method", "track.scrobble")
+		params.Set("api_key", apiKey)
+		params.Set("sk", sessionKey)
+
+		for i, song := range todo[cursor:endPosition] {
 			fmt.Println(i+1, song.Artist, song.Track, song.Time)
 			params.Set(fmt.Sprintf("artist[%d]", i), song.Artist)
 			params.Set(fmt.Sprintf("track[%d]", i), song.Track)
@@ -195,34 +211,32 @@ func importRunner(file string, args *LastfmImportArgs) error {
 		text, _ := reader.ReadString('\n')
 
 		if strings.TrimSpace(text) != "y" {
-			return nil
+			cursor += amountOfScrobbles
+			continue
 		}
 
-		amountOfScrobbles = len(todo)
+		params.Set("api_sig", generateSignature(params, apiSecret))
+		params.Set("format", "json")
+
+		resp, err := http.PostForm(API_END_POINT, params)
+
+		if err != nil {
+			return err
+		}
+
+		if resp.StatusCode > 299 {
+			return fmt.Errorf(resp.Status)
+		}
+
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+
+		fmt.Println(resp.StatusCode, string(body))
+
+		fmt.Println("Scrobbled", amountOfScrobbles, "tracks (hopefully)")
+		cursor += amountOfScrobbles
+		// TODO: take care of the response (does not match PostScrobbleResponse since Scrobble is an array i guess lol)
 	}
-
-	fmt.Println(apiSecret)
-
-	params.Set("api_sig", generateSignature(params, apiSecret))
-	params.Set("format", "json")
-
-	resp, err := http.PostForm(API_END_POINT, params)
-
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode > 299 {
-		return fmt.Errorf(resp.Status)
-	}
-
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-
-	fmt.Println(resp.StatusCode, string(body))
-
-	fmt.Println("Scrobbled", amountOfScrobbles, "tracks (hopefully)")
-	// TODO: take care of the response (does not match PostScrobbleResponse since Scrobble is an array i guess lol)
 
 	return nil
 }

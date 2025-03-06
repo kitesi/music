@@ -55,6 +55,6 @@ func GetCurrentPlayingSong() (SongMetadata, error) {
 	return SongMetadata{
 		Artist: metadata["xesam:artist"],
 		Track:  metadata["xesam:title"],
-		Length: metadata["vlc:length"],
+		Length: metadata["vlc:time"],
 	}, nil
 }
