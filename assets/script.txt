@@ -1,0 +1,23 @@
+ls -R ~/Music
+
+alias mx = "music play"
+
+mx phone
+mx phone#no
+
+mx --live
+
+phone#there
+phone#there,no
+phone#there,no \!warranty
+\?
+
+york -l 2
+york -l 2 --skip 2
+york -l --new
+
+escape live
+
+mx york -l 1 --add-to-tag sad --dry-run
+
+--tag sad

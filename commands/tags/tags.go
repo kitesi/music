@@ -28,9 +28,19 @@ func GetTagPath(musicPath string, tagName string) string {
 
 func GetStoredTags(musicPath string) (map[string][]string, error) {
 	storedTags := make(map[string][]string)
+	tagsDirectory := filepath.Join(musicPath, "tags")
+
 	files, err := os.ReadDir(filepath.Join(musicPath, "tags"))
 
-	// if the tags directory doesn't exist, return an empty map
+	// if the tags directory doesn't exist, create the directory and return an empty map
+	if os.IsNotExist(err) {
+		err := os.Mkdir(tagsDirectory, 0777)
+		if err != nil {
+			return nil, fmt.Errorf("could not create tags directory: %w", err)
+		}
+		return storedTags, nil
+	}
+
 	if err != nil {
 		return storedTags, nil
 	}
