@@ -21,6 +21,7 @@ type LastfmConfig struct {
 	Interval       int
 	MinTrackLength int
 	MinListenTime  int
+	LogDbFile      string
 }
 
 type Config struct {

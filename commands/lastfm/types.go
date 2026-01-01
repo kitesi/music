@@ -96,6 +96,7 @@ type LastfmWatchArgs struct {
 	minTrackLength int
 	minListenTime  int
 	debug          bool
+	logDbFile      string
 }
 
 type LastfmSuggestArgs struct {
