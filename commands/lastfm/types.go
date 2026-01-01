@@ -1,5 +1,7 @@
 package lastfm
 
+import "time"
+
 type Session struct {
 	Name       string
 	Key        string
@@ -21,6 +23,38 @@ type GetSessionResponse struct {
 type PostScrobbleResponse struct {
 	Scrobbles struct {
 		Scrobble struct {
+			Artist struct {
+				Text      string `json:"#text"`
+				Corrected string
+			}
+			Album struct {
+				Text      string `json:"#text"`
+				Corrected string
+			}
+			Track struct {
+				Text      string `json:"#text"`
+				Corrected string
+			}
+			AlbumArtist struct {
+				Text      string `json:"#text"`
+				Corrected string
+			}
+			IgnoredMessage struct {
+				Code string
+				Text string `json:"#text"`
+			}
+			Timestamp string
+		}
+		Attr struct {
+			Ignored  int
+			Accepted int
+		} `json:"@attr"`
+	}
+}
+
+type PostMultipleScrobbleResponse struct {
+	Scrobbles struct {
+		Scrobble []struct {
 			Artist struct {
 				Text      string `json:"#text"`
 				Corrected string
@@ -87,7 +121,7 @@ type CurrentTrackInfo struct {
 	Track        string
 	Artist       string
 	LastPosition float64
-	StartTime    int64
+	StartTime    time.Time
 	Length       float64
 }
 
@@ -117,6 +151,4 @@ type LastfmRecentArgs struct {
 
 type LastfmImportArgs struct {
 	debug bool
-	json  bool
-	text  bool
 }

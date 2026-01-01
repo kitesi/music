@@ -309,7 +309,7 @@ func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *
 		timeConditionPassed = float64(args.minListenTime)
 	}
 
-	realTimePassed := float64(time.Now().Unix()-currentTrack.StartTime) / time.Second.Seconds()
+	realTimePassed := time.Since(currentTrack.StartTime).Seconds()
 	listenStats := fmt.Sprintf("listened for %.2f, real: %.2f, half len: %.2f, min: %d", paddedLastPosition, realTimePassed, currentTrack.Length/2.0, args.minListenTime)
 
 	if timeConditionPassed == -1.0 {
@@ -332,7 +332,7 @@ func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *
 
 		stdOut.Printf("└── scrobbling because %s (%s)", reason, listenStats)
 
-		scrobbleResponse, err := scrobble(credentials, currentTrack.Artist, currentTrack.Track, currentTrack.StartTime)
+		scrobbleResponse, err := scrobble(credentials, currentTrack.Artist, currentTrack.Track, currentTrack.StartTime.Unix())
 
 		if err != nil {
 			insertParams.Fulfilled = false
@@ -386,7 +386,7 @@ func watchForTracks(db *sql.DB, credentials simpleconfig.Config, currentTrack *C
 			currentTrack.Track = track
 			currentTrack.Artist = artist
 			currentTrack.LastPosition = position
-			currentTrack.StartTime = time.Now().Unix()
+			currentTrack.StartTime = time.Now()
 
 			stdOut.Printf("new song detected - %s - %s", artist, track)
 			length, err := strconv.ParseFloat(songMetadata.Length, 64)
@@ -403,7 +403,7 @@ func watchForTracks(db *sql.DB, credentials simpleconfig.Config, currentTrack *C
 		} else {
 			if position < currentTrack.LastPosition {
 				stdErr.Printf("└── playerctl - position went backwards")
-				currentTrack.StartTime = time.Now().Unix()
+				currentTrack.StartTime = time.Now()
 			}
 
 			currentTrack.LastPosition = position
@@ -433,7 +433,7 @@ func watchRunner(args *LastfmWatchArgs) error {
 	var db *sql.DB
 
 	if args.logDbFile != "" {
-		db, err = dbUtils.InitDb(args.logDbFile)
+		db, err = dbUtils.OpenDB(args.logDbFile)
 		if err != nil {
 			return fmt.Errorf("could not load log db file")
 		}
