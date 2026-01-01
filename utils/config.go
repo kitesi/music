@@ -55,6 +55,7 @@ func DefaultConfig() Config {
 			Interval:       DEFAULT_INTERVAL_SECONDS,
 			MinTrackLength: MIN_TRACK_LEN,
 			MinListenTime:  MIN_LISTEN_TIME,
+			LogDbFile:      "",
 		},
 	}
 }

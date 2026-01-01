@@ -23,7 +23,7 @@ func ImportSetup() *cobra.Command {
 
 	lastfmCommand := &cobra.Command{
 		Use:   "import <log-db-file>",
-		Short: "Import unfilled songs from ",
+		Short: "Import unfulfilled scrobbled from a database file",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, positional []string) {
 			if err := importRunner(positional[0], &args); err != nil {
