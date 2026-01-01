@@ -331,7 +331,6 @@ func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *
 		}
 
 		stdOut.Printf("└── scrobbling because %s (%s)", reason, listenStats)
-
 		scrobbleResponse, err := scrobble(credentials, currentTrack.Artist, currentTrack.Track, currentTrack.StartTime.Unix())
 
 		if err != nil {
@@ -343,7 +342,9 @@ func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *
 			stdErr.Printf("└── last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
 		}
 
-		dbUtils.InsertIntoPlays(db, insertParams)
+		if db != nil {
+			dbUtils.InsertIntoPlays(db, insertParams)
+		}
 	} else {
 		stdOut.Printf("└── not scrobbling because while it did pass the time condition, the real time did not pass (%s)", listenStats)
 	}
