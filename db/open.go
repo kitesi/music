@@ -8,6 +8,7 @@ import (
 
 func OpenDB(filePath string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", filePath)
+
 	if err != nil {
 		return nil, err
 	}

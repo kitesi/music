@@ -1,6 +1,8 @@
 package dbUtils
 
-import "database/sql"
+import (
+	"database/sql"
+)
 
 type Migration struct {
 	Version int
@@ -18,6 +20,32 @@ var migrations = []Migration{
 			artist text not null,
 			time timestamp not null
 		);
+		`,
+	},
+	{
+		Version: 2,
+		Up: `
+		alter table plays add column album text;
+		alter table plays add column playedFor integer not null default 180;
+		alter table plays add column length integer not null default 180;
+
+		create table plays_temp (
+			id integer primary key autoincrement,
+			fulfilled boolean not null,
+			album text,
+			artist text not null,
+			title text not null,
+			time timestamp not null,
+			playedFor integer not null,
+			length integer not null
+		);
+
+		insert into plays_temp (
+			id, fulfilled, album, artist, title, time, playedFor, length
+		) select id, fulfilled, album, artist, title, time, playedFor, length from plays;
+
+		drop table plays;
+		alter table plays_temp rename to plays;
 		`,
 	},
 }
@@ -49,7 +77,7 @@ func RunMigrations(db *sql.DB) error {
 	}
 
 	for _, m := range migrations {
-		if m.Version < currentVersion {
+		if m.Version <= currentVersion {
 			continue
 		}
 

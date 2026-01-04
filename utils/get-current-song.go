@@ -6,6 +6,7 @@ import (
 )
 
 type SongMetadata struct {
+	Album  string
 	Artist string
 	Track  string
 	Length string
@@ -54,6 +55,7 @@ func GetCurrentPlayingSong() (SongMetadata, error) {
 
 	return SongMetadata{
 		Artist: metadata["xesam:artist"],
+		Album:  metadata["xesam:album"],
 		Track:  metadata["xesam:title"],
 		Length: metadata["vlc:time"],
 	}, nil

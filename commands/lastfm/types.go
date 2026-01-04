@@ -120,6 +120,7 @@ type GetLastfmSuggestionsResponse struct {
 type CurrentTrackInfo struct {
 	Track        string
 	Artist       string
+	Album        string
 	LastPosition float64
 	StartTime    time.Time
 	Length       float64
