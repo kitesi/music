@@ -1,7 +1,4 @@
 <!-- TODO -->
-<!-- get inspo from https://github.com/Ladbaby/lastfm-scrobbler -->
-<!-- no inspo but alt https://github.com/YodaEmbedding/scrobblez -->
-<!-- no inspo but alt https://github.com/InputUsername/rescrobbled -->
 <!-- https://github.com/ahmagdy/lyricsify?tab=readme-ov-file -->
 <!-- https://github.com/SwagLyrics/SwagLyrics-For-Spotify/tree/master -->
 
@@ -9,19 +6,19 @@
 
 ![Demo of the Query Functionality](./assets/query-demo.gif)
 
--   [About](#about)
--   [Requirements](#requirements)
--   [Installation](#installation)
--   [Usage](#usage)
-    -   [Querying & Playing Music](#querying---playing-music)
-    -   [Live Results](#live-results)
-    -   [Tags](#tags)
-    -   [Spotify Integration](#spotify-integration)
-    -   [Auto Completion](#auto-completion)
-    -   [Lastfm Scrobbling](#lastfm-scrobbling)
-    -   [Lastfm Suggestions](#lastfm-suggestions)
-    -   [Android](#android)
-    -   [Configuration](#configuration)
+- [About](#about)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Querying & Playing Music](#querying---playing-music)
+  - [Live Results](#live-results)
+  - [Tags](#tags)
+  - [Lastfm Scrobbling](#lastfm-scrobbling)
+  - [Lastfm Suggestions](#lastfm-suggestions)
+  - [Spotify Integration](#spotify-integration)
+  - [Auto Completion](#auto-completion)
+  - [Android](#android)
+  - [Configuration](#configuration)
 
 ## About
 
@@ -37,8 +34,8 @@ This program does not support piracy; you should have the rights to all your fil
 
 ## Requirements
 
--   VLC (if you plan on listening to music or scrobbling)
--   playerctl (if you plan on scrobbling to lastfm with vlc)
+- VLC (if you plan on listening to music or scrobbling)
+- playerctl (if you plan on scrobbling to lastfm with vlc)
 
 ## Installation
 
@@ -89,11 +86,11 @@ music play tonight monday#mornings care,bear,say make#you,me#believe \!joe
 
 There are four terms here:
 
--   `tonight` (song has to have the word "tonight" somewhere in the path)
--   `monday#mornings` (song has to have both words "monday" and "mornings" (not necessarily next to each other))
--   `care,bear,say` (song has to have one or more of "care", "bear", "say")
--   `make#you,me#believe` (song has to have "make", either "you" or "me", and "believe")
--   `\!joe` (the song can't have the term, notice the escaping of "!")
+- `tonight` (song has to have the word "tonight" somewhere in the path)
+- `monday#mornings` (song has to have both words "monday" and "mornings" (not necessarily next to each other))
+- `care,bear,say` (song has to have one or more of "care", "bear", "say")
+- `make#you,me#believe` (song has to have "make", either "you" or "me", and "believe")
+- `\!joe` (the song can't have the term, notice the escaping of "!")
 
 When combining these terms, the string is split by `#` first, and then `,`.
 
@@ -128,6 +125,74 @@ The intended way to add songs to a tag is to query the songs with `music play`
 and then using `--add-to-tag | -a <tag>` or `--set-to-tag | -s <tag>`. If you
 need to query but don't want to actually play the songs you can add `--dry-run`.
 
+### Lastfm Scrobbling
+
+While VLC does have built in lastfm scrobbling, I could not get it to work
+(edit: I actually got it to work, but it doesn't scrobble certain tracks and I
+kinda already built this so whatever). You can run a watch server to watch for
+playing songs every x seconds (defaulted to 10). It uses playerctl (MPRIS)
+under the hood, so you will need to have that installed and be on linux (in the
+future I could add vlc tcp support so that non-linux users could also use). It
+also only checks for the VLC player so other media players or something like
+youtube will not be logged. An alternative would be
+[multi-scrobbler](https://github.com/FoxxMD/multi-scrobbler) which supports a
+lot more sources, and has a lot more functionality overall.
+
+Currently, the scrobble detection is kind of poor. It follows the approach of
+minimizing false positives, so if you skip/seek around, it likely won't
+scrobble. Also, if you play the same song over and over it won't scrobble more
+than once (although this will be fixed in the future).
+
+Lastly, it follows the [lastfm standards](https://www.last.fm/api/scrobbling):
+
+1.  The track must be longer than 30 seconds.
+2.  The track has been played for at least half its duration, or for 4 minutes (whichever occurs earlier.)
+
+To get started first make an api account and application on [last.fm](https://www.last.fm/api/account/create). You then need to create a file (".lastfm-credentials") in your cache directory.
+In that file you should store your api_key and your api_secret:
+
+```
+api_key=xxxxx
+api_secret=yyyy
+```
+
+Then just run the lastfm watch command, and it will automatically get the session_key:
+
+```
+music lastfm watch --interval 20 --debug
+```
+
+I personally have this command start on startup, and I redirect the output to `/tmp/music-lastfm.log`. This program can also
+write the logs to a local sqlite database file. This is helpful for if you want to keep a local copy of your scrobbles
+and in case a valid scrobble fails (network issues or lastfm downtime). You can enable this with the `--log-db-file` flag.
+
+```
+music lastfm watch --log-db-file /home/user/.local/state/lastfm-scrobbles.db
+```
+
+If a scrobble fails, it will not be retried automatically or on the next run, but you can use the `music lastfm import` to import
+all the failed scrobbles from the database file.
+
+### Lastfm Scrobbler Alternatives
+
+There are a few alternatives to this scrobbling functionality. In particular, one thing this program does not include that many others do, is some way to edit/filter artist/titles/albums before scrobbling. I personally don't need it, as I only use this program for local files, and if there is an error with my metadata I fix it at the source using `atomicparsley`. Similarly, I don't include any other MPRIS player other than VLC as that's the only one I use (and I'm not sure anyone else uses this). However, I understand that these are useful features for many people.
+
+I have not tried any of the following, so I don't necessarily endorse them, but they are worth checking out:
+
+- [YodaEmbedding/scrobblez](https://github.com/YodaEmbedding/scrobblez) last update was 6 years ago, so actually, maybe not this one
+- [Ladbaby/lastfm-scrobbler](https://github.com/Ladbaby/lastfm-scrobbler)
+- [InputUsername/rescobbled](https://github.com/InputUsername/rescrobbled)
+
+### Lastfm Suggestions
+
+You can also get lastfm suggestions (on any OS, without authentication) with the suggest command.
+
+```
+music lastfm suggest username --limit 20
+```
+
+If you would like to automatically install the music add the `--install` flag which will install to `$MUSIC_PATH/Suggestions`.
+
 ### Spotify Integration
 
 You can also sync Spotify playlists and albums with local tags. To get started first
@@ -135,10 +200,10 @@ create a Spotify developer account and make an application. Then create a file "
 
 Your cache directory is determined by Go below:
 
--   On Unix systems, it returns `$XDG_CACHE_HOME` as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.cache.
--   On Darwin, it returns `$HOME/Library/Caches`
--   On Windows, it returns `%LocalAppData%`
--   On Plan 9, it returns `$home/lib/cache`
+- On Unix systems, it returns `$XDG_CACHE_HOME` as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.cache.
+- On Darwin, it returns `$HOME/Library/Caches`
+- On Windows, it returns `%LocalAppData%`
+- On Plan 9, it returns `$home/lib/cache`
 
 In your new file you should store your client_id and client_secret:
 
@@ -192,63 +257,14 @@ The cobra provided completion is also a bit more descriptive than I personally
 like, which is why I use my own personal bash completion. It can be found in
 `./completion.bash`
 
--   Note: I have `m` as an alias for `music` and `mx` as an alias for `music play`
--   Note: It's also more static/hard-coded, so a bit more error-prone/inaccurate.
-
-### Lastfm Scrobbling
-
-While VLC does have built in lastfm scrobbling, I could not get it to work
-(edit: I actually got it to work, but it doesn't scrobble certain tracks and I
-kinda already built this so whatever). You can run a watch server to watch for
-playing songs every x seconds (defaulted to 10). It uses playerctl (MPRIS)
-under the hood, so you will need to have that installed and be on linux (in the
-future I could add vlc tcp support so that non-linux users could also use). It
-also only checks for the VLC player so other media players or something like
-youtube will not be logged. An alternative would be
-[multi-scrobbler](https://github.com/FoxxMD/multi-scrobbler) which supports a
-lot more sources, and has a lot more functionality overall.
-
-Currently, the scrobble detection is kind of poor. It follows the approach of
-minimizing false positives, so if you skip/seek around, it likely won't
-scrobble. Also, if you play the same song over and over it won't scrobble more
-than once (although this will be fixed in the future).
-
-Lastly, it follows the [lastfm standards](https://www.last.fm/api/scrobbling):
-
-1.  The track must be longer than 30 seconds.
-2.  The track has been played for at least half its duration, or for 4 minutes (whichever occurs earlier.)
-
-To get started first make an api account and application on [last.fm](https://www.last.fm/api/account/create). You then need to create a file (".lastfm-credentials") in your cache directory.
-In that file you should store your api_key and your api_secret:
-
-```
-api_key=xxxxx
-api_secret=yyyy
-```
-
-Then just run the lastfm watch command, and it will automatically get the session_key:
-
-```
-music lastfm watch --interval 20 --debug
-```
-
-I personally have this command start on startup, and I redirect the output to `/tmp/music-lastfm.log`.
-
-### Lastfm Suggestions
-
-You can also get lastfm suggestions (on any OS, without authentication) with the suggest command.
-
-```
-music lastfm suggest username --limit 20
-```
-
-If you would like to automatically install the music add the `--install` flag which will install to `$MUSIC_PATH/Suggestions`.
+- Note: I have `m` as an alias for `music` and `mx` as an alias for `music play`
+- Note: It's also more static/hard-coded, so a bit more error-prone/inaccurate.
 
 ### Android
 
 If you would like to use the one of main functionalities of querying on android,
 you can do so using Termux. You will likely have to install go first and then
-follow the instructions in #installation.
+follow the instructions in [#installation](#installation).
 
 After you have the music command installed, you want to download the wrapper script
 in `./android-termux-mx`. This script calls the play command with the given query
@@ -273,7 +289,7 @@ hanging, and you won't have vlc in your notification tray.
 
 The configuration file is located in `<$CONFIG_DIR>/go-music-kitesi/config.json`. An example can be found in [assets/default-config.json](assets/default-config.json). `<$CONFIG_DIR>` is specified as below:
 
--   On Unix systems, it returns $XDG_CONFIG_HOME as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.config.
--   On Darwin, it returns `$HOME/Library/Application Support`.
--   On Windows, it returns `%AppData%`.
--   On Plan 9, it returns `$home/lib`.
+- On Unix systems, it returns $XDG_CONFIG_HOME as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.config.
+- On Darwin, it returns `$HOME/Library/Application Support`.
+- On Windows, it returns `%AppData%`.
+- On Plan 9, it returns `$home/lib`.

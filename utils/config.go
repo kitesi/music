@@ -21,6 +21,7 @@ type LastfmConfig struct {
 	Interval       int
 	MinTrackLength int
 	MinListenTime  int
+	LogDbFile      string
 }
 
 type Config struct {
@@ -54,6 +55,7 @@ func DefaultConfig() Config {
 			Interval:       DEFAULT_INTERVAL_SECONDS,
 			MinTrackLength: MIN_TRACK_LEN,
 			MinListenTime:  MIN_LISTEN_TIME,
+			LogDbFile:      "",
 		},
 	}
 }

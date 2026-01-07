@@ -2,6 +2,7 @@ package lastfm
 
 import (
 	"crypto/md5"
+	"database/sql"
 	"syscall"
 
 	"encoding/hex"
@@ -22,14 +23,15 @@ import (
 	"time"
 
 	// import Config from here as SimpleConfig
+
+	dbUtils "github.com/kitesi/music/db"
 	"github.com/kitesi/music/simpleconfig"
 	"github.com/kitesi/music/utils"
 	"github.com/spf13/cobra"
 )
 
 const (
-	API_END_POINT          = "http://ws.audioscrobbler.com/2.0/"
-	REAL_TIME_ERROR_MARGIN = 10.0
+	API_END_POINT = "http://ws.audioscrobbler.com/2.0/"
 )
 
 func WatchSetup() *cobra.Command {
@@ -58,6 +60,7 @@ func WatchSetup() *cobra.Command {
 	}
 
 	lastfmCommand.Flags().IntVarP(&args.interval, "interval", "i", config.LastFm.Interval, "interval in seconds to check for new tracks")
+	lastfmCommand.Flags().StringVar(&args.logDbFile, "log-db-file", config.LastFm.LogDbFile, "sqlite database file to log scrobbles to")
 	lastfmCommand.Flags().IntVar(&args.minTrackLength, "min-track-length", config.LastFm.MinTrackLength, "the minimum track length to scrobble")
 	lastfmCommand.Flags().IntVar(&args.minListenTime, "min-listen-length", config.LastFm.MinListenTime, "the minimum listem time to scrobble (as a shorter alternative to half way through the track)")
 	lastfmCommand.Flags().BoolVar(&args.debug, "debug", config.Debug, "set debug mode")
@@ -169,7 +172,7 @@ func getSession(apiKey string, apiSecret string, token string) (Session, error) 
 	return resultJson.Session, nil
 }
 
-func scrobble(credentials simpleconfig.Config, artist string, track string, timestamp int64) (PostScrobbleResponse, error) {
+func scrobble(credentials simpleconfig.Config, album string, artist string, track string, timestamp int64) (PostScrobbleResponse, error) {
 	apiKey, _ := credentials.Get("api_key")
 	apiSecret, _ := credentials.Get("api_secret")
 	sessionKey, _ := credentials.Get("session_key")
@@ -177,6 +180,7 @@ func scrobble(credentials simpleconfig.Config, artist string, track string, time
 	params := url.Values{}
 	params.Set("method", "track.scrobble")
 	params.Set("api_key", apiKey)
+	params.Set("album", album)
 	params.Set("artist", artist)
 	params.Set("track", track)
 	params.Set("timestamp", fmt.Sprint(timestamp))
@@ -295,35 +299,47 @@ func getCurrentPosition() (float64, error) {
 	return position, nil
 }
 
-func attemptScrobble(credentials simpleconfig.Config, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, currentPosition float64, stdOut *log.Logger, stdErr *log.Logger) {
+func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, currentPosition float64, stdOut *log.Logger, stdErr *log.Logger) {
 	paddedLastPosition := currentTrack.LastPosition + float64(args.interval) - currentPosition
 	timeConditionPassed := -1.0
+	passingReason := ""
 
 	if paddedLastPosition > currentTrack.Length/2.0 {
 		timeConditionPassed = currentTrack.Length / 2.0
+		passingReason = "it is over half way through"
 	} else if paddedLastPosition > float64(args.minListenTime) {
 		timeConditionPassed = float64(args.minListenTime)
+		passingReason = "it has been listened to for over the minimum listen time"
 	}
 
-	realTimePassed := float64(time.Now().Unix()-currentTrack.StartTime) / time.Second.Seconds()
+	realTimePassed := time.Since(currentTrack.StartTime).Seconds()
 	listenStats := fmt.Sprintf("listened for %.2f, real: %.2f, half len: %.2f, min: %d", paddedLastPosition, realTimePassed, currentTrack.Length/2.0, args.minListenTime)
 
 	if timeConditionPassed == -1.0 {
 		stdOut.Printf("└── not scrobbling because it did not pass either listen condition (%s)", listenStats)
-	} else if realTimePassed > timeConditionPassed-REAL_TIME_ERROR_MARGIN {
-		reason := ""
+	} else if realTimePassed >= timeConditionPassed-float64(args.interval)*2 {
+		// ^add a bit of leniency for the real time passed since we poll
+		playedFor := int(paddedLastPosition)
 
-		if paddedLastPosition > currentTrack.Length/2.0 {
-			reason = "it is over half way through"
-		} else {
-			reason = "it has been listened to for over the minimum listen time"
+		if playedFor > int(currentTrack.Length) {
+			playedFor = int(currentTrack.Length)
 		}
 
-		stdOut.Printf("└── scrobbling because %s (%s)", reason, listenStats)
+		insertParams := dbUtils.InsertIntoPlaysParams{
+			Fulfilled: true,
+			Title:     currentTrack.Track,
+			Artist:    currentTrack.Artist,
+			Album:     currentTrack.Album,
+			PlayedFor: playedFor,
+			Length:    int(currentTrack.Length),
+			StartTime: currentTrack.StartTime,
+		}
 
-		scrobbleResponse, err := scrobble(credentials, currentTrack.Artist, currentTrack.Track, currentTrack.StartTime)
+		stdOut.Printf("└── scrobbling because %s (%s)", passingReason, listenStats)
+		scrobbleResponse, err := scrobble(credentials, currentTrack.Album, currentTrack.Artist, currentTrack.Track, currentTrack.StartTime.Unix())
 
 		if err != nil {
+			insertParams.Fulfilled = false
 			stdErr.Printf("└── last.fm api error - %s", err.Error())
 		}
 
@@ -331,12 +347,17 @@ func attemptScrobble(credentials simpleconfig.Config, currentTrack *CurrentTrack
 			stdErr.Printf("└── last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
 		}
 
+		if db != nil {
+			if err := dbUtils.InsertIntoPlays(db, insertParams); err != nil {
+				stdErr.Printf("└── could not log scrobble to db - %s", err.Error())
+			}
+		}
 	} else {
 		stdOut.Printf("└── not scrobbling because while it did pass the time condition, the real time did not pass (%s)", listenStats)
 	}
 }
 
-func watchForTracks(credentials simpleconfig.Config, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, stdOut *log.Logger, stdErr *log.Logger) {
+func watchForTracks(db *sql.DB, credentials simpleconfig.Config, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, stdOut *log.Logger, stdErr *log.Logger) {
 	waitTime := time.Duration(args.interval) * time.Second
 
 	for {
@@ -344,9 +365,10 @@ func watchForTracks(credentials simpleconfig.Config, currentTrack *CurrentTrackI
 
 		if err != nil {
 			if currentTrack.Track != "" {
-				attemptScrobble(credentials, currentTrack, args, 0.0, stdOut, stdErr)
+				attemptScrobble(db, credentials, currentTrack, args, 0.0, stdOut, stdErr)
 				currentTrack.Track = ""
 				currentTrack.Artist = ""
+				currentTrack.Album = ""
 			}
 
 			stdErr.Println(err)
@@ -362,18 +384,20 @@ func watchForTracks(credentials simpleconfig.Config, currentTrack *CurrentTrackI
 			continue
 		}
 
+		album := songMetadata.Album
 		artist := songMetadata.Artist
 		track := songMetadata.Track
 
-		if ((artist != currentTrack.Artist || track != currentTrack.Track) || position < currentTrack.LastPosition) && currentTrack.Track != "" && currentTrack.Length != -1.0 {
-			attemptScrobble(credentials, currentTrack, args, position, stdOut, stdErr)
+		if ((artist != currentTrack.Artist || track != currentTrack.Track || album != currentTrack.Album) || position < currentTrack.LastPosition) && currentTrack.Track != "" && currentTrack.Length != -1.0 {
+			attemptScrobble(db, credentials, currentTrack, args, position, stdOut, stdErr)
 		}
 
 		if artist != currentTrack.Artist || track != currentTrack.Track {
 			currentTrack.Track = track
 			currentTrack.Artist = artist
+			currentTrack.Album = album
 			currentTrack.LastPosition = position
-			currentTrack.StartTime = time.Now().Unix()
+			currentTrack.StartTime = time.Now()
 
 			stdOut.Printf("new song detected - %s - %s", artist, track)
 			length, err := strconv.ParseFloat(songMetadata.Length, 64)
@@ -390,7 +414,7 @@ func watchForTracks(credentials simpleconfig.Config, currentTrack *CurrentTrackI
 		} else {
 			if position < currentTrack.LastPosition {
 				stdErr.Printf("└── playerctl - position went backwards")
-				currentTrack.StartTime = time.Now().Unix()
+				currentTrack.StartTime = time.Now()
 			}
 
 			currentTrack.LastPosition = position
@@ -415,6 +439,21 @@ func watchRunner(args *LastfmWatchArgs) error {
 
 	if err == nil {
 		return fmt.Errorf("server is already running - if it is not, delete %s and try again", lockFileName)
+	}
+
+	var db *sql.DB
+
+	if args.logDbFile != "" {
+		db, err = dbUtils.OpenDB(args.logDbFile)
+		if err != nil {
+			return fmt.Errorf("could not load log db file")
+		}
+		defer db.Close()
+		err = dbUtils.RunMigrations(db)
+
+		if err != nil {
+			return fmt.Errorf("could not run migrations on log db file: %s", err.Error())
+		}
 	}
 
 	credentials, err := setupOrGetCredentials()
@@ -448,7 +487,7 @@ func watchRunner(args *LastfmWatchArgs) error {
 			if err != nil {
 				stdErrLog.Println("could not get position when gracefully exiting")
 			} else {
-				attemptScrobble(credentials, &currentTrack, args, position, stdOutLog, stdErrLog)
+				attemptScrobble(db, credentials, &currentTrack, args, position, stdOutLog, stdErrLog)
 			}
 		} else {
 			stdOutLog.Println("did not find any track when gracefully exiting")
@@ -457,6 +496,6 @@ func watchRunner(args *LastfmWatchArgs) error {
 		os.Exit(0)
 	}()
 
-	watchForTracks(credentials, &currentTrack, args, stdOutLog, stdErrLog)
+	watchForTracks(db, credentials, &currentTrack, args, stdOutLog, stdErrLog)
 	return nil
 }
