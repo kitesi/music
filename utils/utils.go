@@ -30,7 +30,11 @@ func GetDefaultMusicPath() (string, error) {
 }
 
 func GetBareSongName(song string, musicPath string) string {
-	return strings.Replace(song, musicPath+"/", "", 1)
+	if !strings.HasSuffix(musicPath, "/") {
+		musicPath += "/"
+	}
+
+	return strings.Replace(song, musicPath, "", 1)
 }
 
 func CreateAndModifyTemp(dir, pattern, preloadedContent string) (string, error) {
