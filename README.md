@@ -287,7 +287,7 @@ hanging, and you won't have vlc in your notification tray.
 
 ### Configuration
 
-The configuration file is located in `<$CONFIG_DIR>/go-music-kitesi/config.json`. An example can be found in [assets/default-config.json](assets/default-config.json). `<$CONFIG_DIR>` is specified as below:
+The configuration file is located in `<$CONFIG_DIR>/go-music-kitesi/config.json`. An example can be found in [assets/default-config.jsonc](assets/default-config.jsonc). `<$CONFIG_DIR>` is specified as below:
 
 - On Unix systems, it returns $XDG_CONFIG_HOME as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.config.
 - On Darwin, it returns `$HOME/Library/Application Support`.

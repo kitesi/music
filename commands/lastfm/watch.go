@@ -63,6 +63,7 @@ func WatchSetup() *cobra.Command {
 	lastfmCommand.Flags().StringVar(&args.logDbFile, "log-db-file", config.LastFm.LogDbFile, "sqlite database file to log scrobbles to")
 	lastfmCommand.Flags().IntVar(&args.minTrackLength, "min-track-length", config.LastFm.MinTrackLength, "the minimum track length to scrobble")
 	lastfmCommand.Flags().IntVar(&args.minListenTime, "min-listen-length", config.LastFm.MinListenTime, "the minimum listem time to scrobble (as a shorter alternative to half way through the track)")
+	lastfmCommand.Flags().StringVar(&args.source, "source", config.LastFm.Source, "source to log scrobbles as (e.g. pc, web, vlc, etc.)")
 	lastfmCommand.Flags().BoolVar(&args.debug, "debug", config.Debug, "set debug mode")
 
 	return lastfmCommand
@@ -333,6 +334,7 @@ func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *
 			PlayedFor: playedFor,
 			Length:    int(currentTrack.Length),
 			StartTime: currentTrack.StartTime,
+			Source:    args.source,
 		}
 
 		stdOut.Printf("└── scrobbling because %s (%s)", passingReason, listenStats)

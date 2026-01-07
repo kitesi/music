@@ -48,6 +48,12 @@ var migrations = []Migration{
 		alter table plays_temp rename to plays;
 		`,
 	},
+	{
+		Version: 3,
+		Up: `
+		alter table plays add column source text;
+		`,
+	},
 }
 
 func getCurrentVersion(db *sql.DB) (int, error) {

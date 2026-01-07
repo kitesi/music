@@ -23,10 +23,11 @@ type InsertIntoPlaysParams struct {
 	PlayedFor int
 	Length    int
 	StartTime time.Time
+	Source    string
 }
 
 const INSERT_INTO_PLAYS_QUERY = `
-	insert into plays (fulfilled, title, artist, album, playedFor, length, time) values (?, ?, ?, ?, ?, ?, ?)
+	insert into plays (fulfilled, title, artist, album, playedFor, length, time, source) values (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 func InsertIntoPlays(db *sql.DB, params InsertIntoPlaysParams) error {
@@ -39,6 +40,7 @@ func InsertIntoPlays(db *sql.DB, params InsertIntoPlaysParams) error {
 		params.PlayedFor,
 		params.Length,
 		params.StartTime,
+		params.Source,
 	)
 	return err
 }
