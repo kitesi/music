@@ -1,6 +1,6 @@
 module github.com/kitesi/music
 
-go 1.18
+go 1.21
 
 require (
 	github.com/djherbis/times v1.5.0

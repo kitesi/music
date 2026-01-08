@@ -1,0 +1,11 @@
+{
+  "musicPath": "/home/username/Music",
+  "debug": false,
+  "lastfm": {
+    "interval": 10,
+    "minTrackLength": 30,
+    "minListenTime": 240, 
+    "logDbFile": "", // Path to log database file, e.g. "/home/username/.config/lastfm-log.db"
+    "source": "", // Source identifier for scrobbles, e.g. "phone", "web", etc.
+  },
+}
