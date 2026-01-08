@@ -9,10 +9,10 @@ import (
 
 type Play struct {
 	ID        int64
-	Fulfilled bool
-	Title     string
+	Album     string
 	Artist    string
-	Time      time.Time
+	Title     string
+	StartTime time.Time
 }
 
 type InsertIntoPlaysParams struct {
@@ -66,7 +66,7 @@ func InsertIntoPlays(db *sql.DB, params InsertIntoPlaysParams) error {
 
 // for now no pagination, just assume we can fit all unfulfilled plays in memory
 const GET_UNFULFILLED_PLAYS_QUERY = `
-	select * from plays where fulfilled = false and scrobbable = true;
+	select id,album,artist,title,started_at from plays where fulfilled = false and scrobbable = true;
 `
 
 func GetUnfulfilledPlays(db *sql.DB) ([]Play, error) {
@@ -81,7 +81,7 @@ func GetUnfulfilledPlays(db *sql.DB) ([]Play, error) {
 
 	for rows.Next() {
 		var play Play
-		if err := rows.Scan(&play.ID, &play.Fulfilled, &play.Title, &play.Artist, &play.Time); err != nil {
+		if err := rows.Scan(&play.ID, &play.Album, &play.Artist, &play.Title, &play.StartTime); err != nil {
 			return nil, err
 		}
 		plays = append(plays, play)
@@ -94,7 +94,7 @@ func GetUnfulfilledPlays(db *sql.DB) ([]Play, error) {
 }
 
 const UPDATE_UNFULFILLED_PLAYS_QUERY_HELPER = `
-	update plays set fulfilled = true where id in (%s)
+	update plays set fulfilled = true where id in (%s);
 `
 
 func UpdateUnfulfilledPlays(db *sql.DB, plays []Play) error {
