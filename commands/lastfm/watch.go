@@ -3,6 +3,7 @@ package lastfm
 import (
 	"crypto/md5"
 	"database/sql"
+	"math"
 	"syscall"
 
 	"encoding/hex"
@@ -300,62 +301,62 @@ func getCurrentPosition() (float64, error) {
 	return position, nil
 }
 
-func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, currentPosition float64, stdOut *log.Logger, stdErr *log.Logger) {
-	paddedLastPosition := currentTrack.LastPosition + float64(args.interval) - currentPosition
-	timeConditionPassed := -1.0
-	passingReason := ""
+const SEEK_TOLERANCE_SECONDS = 8
+const SESSION_RESET_THRESHOLD_SECONDS = 90
+const DRIFT_TOLERANCE_SECONDS = 1.5
 
-	if paddedLastPosition > currentTrack.Length/2.0 {
-		timeConditionPassed = currentTrack.Length / 2.0
-		passingReason = "it is over half way through"
-	} else if paddedLastPosition > float64(args.minListenTime) {
-		timeConditionPassed = float64(args.minListenTime)
-		passingReason = "it has been listened to for over the minimum listen time"
+func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, currentPosition float64, stdOut *log.Logger, stdErr *log.Logger) {
+	passingReason := ""
+	uniqueCoverage, maxPosition := currentTrack.UniqueCoverageAndMaxPosition()
+
+	if uniqueCoverage > currentTrack.Duration/2.0 {
+		passingReason = "it covered over half the track uniquely"
+	} else if currentTrack.ListenTime > float64(args.minListenTime) {
+		passingReason = "it listened for over the minimum listen time"
 	}
 
 	realTimePassed := time.Since(currentTrack.StartTime).Seconds()
-	listenStats := fmt.Sprintf("listened for %.2f, real: %.2f, half len: %.2f, min: %d", paddedLastPosition, realTimePassed, currentTrack.Length/2.0, args.minListenTime)
+	currentTrack.WallTime = realTimePassed
+	listenStats := fmt.Sprintf("unique coverage for %.2f, listen time: %.2f, wall time: %.2f, half len: %.2f, min: %d", uniqueCoverage, currentTrack.ListenTime, currentTrack.WallTime, currentTrack.Duration/2.0, args.minListenTime)
 
-	if timeConditionPassed == -1.0 {
+	insertParams := dbUtils.InsertIntoPlaysParams{
+		Fulfilled:      false,
+		Scrobbable:     false,
+		Title:          currentTrack.Track,
+		Artist:         currentTrack.Artist,
+		Album:          currentTrack.Album,
+		ListenTime:     int(currentTrack.ListenTime),
+		WallTime:       int(currentTrack.WallTime),
+		SeekCount:      currentTrack.SeekCount,
+		MaxPosition:    int(maxPosition),
+		UniqueCoverage: int(uniqueCoverage),
+		Duration:       int(currentTrack.Duration),
+		StartTime:      currentTrack.StartTime,
+		Source:         args.source,
+	}
+
+	if passingReason == "" {
 		stdOut.Printf("└── not scrobbling because it did not pass either listen condition (%s)", listenStats)
-	} else if realTimePassed >= timeConditionPassed-float64(args.interval)*2 {
-		// ^add a bit of leniency for the real time passed since we poll
-		playedFor := int(paddedLastPosition)
-
-		if playedFor > int(currentTrack.Length) {
-			playedFor = int(currentTrack.Length)
-		}
-
-		insertParams := dbUtils.InsertIntoPlaysParams{
-			Fulfilled: true,
-			Title:     currentTrack.Track,
-			Artist:    currentTrack.Artist,
-			Album:     currentTrack.Album,
-			PlayedFor: playedFor,
-			Length:    int(currentTrack.Length),
-			StartTime: currentTrack.StartTime,
-			Source:    args.source,
-		}
+	} else {
+		insertParams.Scrobbable = true
 
 		stdOut.Printf("└── scrobbling because %s (%s)", passingReason, listenStats)
 		scrobbleResponse, err := scrobble(credentials, currentTrack.Album, currentTrack.Artist, currentTrack.Track, currentTrack.StartTime.Unix())
 
 		if err != nil {
-			insertParams.Fulfilled = false
 			stdErr.Printf("└── last.fm api error - %s", err.Error())
-		}
-
-		if scrobbleResponse.Scrobbles.Attr.Ignored == 1 {
-			stdErr.Printf("└── last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
-		}
-
-		if db != nil {
-			if err := dbUtils.InsertIntoPlays(db, insertParams); err != nil {
-				stdErr.Printf("└── could not log scrobble to db - %s", err.Error())
+		} else {
+			insertParams.Fulfilled = true
+			if scrobbleResponse.Scrobbles.Attr.Ignored == 1 {
+				stdErr.Printf("└── last.fm ignored this scrobble - %s", scrobbleResponse.Scrobbles.Scrobble.IgnoredMessage.Text)
 			}
 		}
-	} else {
-		stdOut.Printf("└── not scrobbling because while it did pass the time condition, the real time did not pass (%s)", listenStats)
+	}
+
+	if db != nil {
+		if err := dbUtils.InsertIntoPlays(db, insertParams); err != nil {
+			stdErr.Printf("└── could not log scrobble to db - %s", err.Error())
+		}
 	}
 }
 
@@ -365,12 +366,14 @@ func watchForTracks(db *sql.DB, credentials simpleconfig.Config, currentTrack *C
 	for {
 		position, err := getCurrentPosition()
 
+		// if we can't get the position, attempt to scrobble the current track and reset
 		if err != nil {
 			if currentTrack.Track != "" {
 				attemptScrobble(db, credentials, currentTrack, args, 0.0, stdOut, stdErr)
 				currentTrack.Track = ""
 				currentTrack.Artist = ""
 				currentTrack.Album = ""
+				currentTrack.ResetMetrics()
 			}
 
 			stdErr.Println(err)
@@ -379,6 +382,7 @@ func watchForTracks(db *sql.DB, credentials simpleconfig.Config, currentTrack *C
 		}
 
 		songMetadata, err := utils.GetCurrentPlayingSong()
+		now := time.Now()
 
 		if err != nil {
 			stdErr.Println(err)
@@ -390,38 +394,54 @@ func watchForTracks(db *sql.DB, credentials simpleconfig.Config, currentTrack *C
 		artist := songMetadata.Artist
 		track := songMetadata.Track
 
-		if ((artist != currentTrack.Artist || track != currentTrack.Track || album != currentTrack.Album) || position < currentTrack.LastPosition) && currentTrack.Track != "" && currentTrack.Length != -1.0 {
-			attemptScrobble(db, credentials, currentTrack, args, position, stdOut, stdErr)
-		}
+		// we've found a new song
+		if artist != currentTrack.Artist || track != currentTrack.Track || album != currentTrack.Album {
+			if currentTrack.Track != "" && currentTrack.Duration != -1.0 {
+				attemptScrobble(db, credentials, currentTrack, args, position, stdOut, stdErr)
+			}
 
-		if artist != currentTrack.Artist || track != currentTrack.Track {
 			currentTrack.Track = track
 			currentTrack.Artist = artist
 			currentTrack.Album = album
-			currentTrack.LastPosition = position
-			currentTrack.StartTime = time.Now()
+
+			currentTrack.ResetMetrics()
+			currentTrack.StartTime = now
 
 			stdOut.Printf("new song detected - %s - %s", artist, track)
 			length, err := strconv.ParseFloat(songMetadata.Length, 64)
 
 			if err != nil {
 				stdErr.Printf("└── playerctl - could not parse length of")
-				currentTrack.Length = -1.0
+				currentTrack.Duration = -1.0
 			} else if length < float64(args.minTrackLength) {
 				stdOut.Printf("└── skipping track because it is too short")
-				currentTrack.Length = -1.0
+				currentTrack.Duration = -1.0
 			} else {
-				currentTrack.Length = length
+				currentTrack.Duration = length
 			}
 		} else {
-			if position < currentTrack.LastPosition {
-				stdErr.Printf("└── playerctl - position went backwards")
-				currentTrack.StartTime = time.Now()
-			}
+			deltaPos := position - currentTrack.LastPosition
+			absDeltaPos := math.Abs(deltaPos)
+			deltaTime := time.Since(currentTrack.LastUpdate).Seconds()
+			expectedPos := currentTrack.LastPosition + deltaTime
 
-			currentTrack.LastPosition = position
+			if deltaPos > 0 && math.Abs(position-expectedPos) < DRIFT_TOLERANCE_SECONDS { // natural playback
+				currentTrack.ListenTime += deltaTime
+				currentTrack.AddListenRange(currentTrack.LastPosition, position)
+			} else if absDeltaPos > SESSION_RESET_THRESHOLD_SECONDS { // too much of a jump, reset session
+				if currentTrack.Duration != -1.0 {
+					attemptScrobble(db, credentials, currentTrack, args, position, stdOut, stdErr)
+				}
+				currentTrack.ResetMetrics()
+				currentTrack.StartTime = now
+			} else if absDeltaPos > SEEK_TOLERANCE_SECONDS { // medium seek, intentional repositioning
+				currentTrack.SeekCount++
+				stdOut.Printf("└── playerctl - position seeked")
+			}
 		}
 
+		currentTrack.LastPosition = position
+		currentTrack.LastUpdate = now
 		time.Sleep(waitTime)
 	}
 }
@@ -473,10 +493,6 @@ func watchRunner(args *LastfmWatchArgs) error {
 	currentTrack := CurrentTrackInfo{}
 	stdOutLog := log.New(os.Stdout, "info : ", log.LstdFlags)
 	stdErrLog := log.New(os.Stderr, "error: ", log.LstdFlags)
-
-	if !args.debug {
-		stdErrLog.SetOutput(io.Discard)
-	}
 
 	go func() {
 		<-gracefulExit

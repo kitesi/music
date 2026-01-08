@@ -1,6 +1,9 @@
 package lastfm
 
-import "time"
+import (
+	"sort"
+	"time"
+)
 
 type Session struct {
 	Name       string
@@ -117,13 +120,74 @@ type GetLastfmSuggestionsResponse struct {
 	}
 }
 
+type SongListenRange struct {
+	Start float64
+	End   float64
+}
+
 type CurrentTrackInfo struct {
-	Track        string
-	Artist       string
-	Album        string
+	Track    string
+	Artist   string
+	Album    string
+	Duration float64
+
+	StartTime  time.Time
+	LastUpdate time.Time
+
 	LastPosition float64
-	StartTime    time.Time
-	Length       float64
+
+	ListenTime float64
+	WallTime   float64 // real time passed since starting to play
+
+	Ranges    []SongListenRange
+	SeekCount int
+}
+
+func (cti *CurrentTrackInfo) ResetMetrics() {
+	cti.Duration = 0
+	cti.StartTime = time.Time{}
+	cti.LastUpdate = time.Time{}
+	cti.LastPosition = 0
+	cti.ListenTime = 0
+	cti.WallTime = 0
+	cti.Ranges = []SongListenRange{}
+	cti.SeekCount = 0
+}
+
+func (cti *CurrentTrackInfo) AddListenRange(start, end float64) {
+	if end > start {
+		cti.Ranges = append(cti.Ranges, SongListenRange{
+			Start: start,
+			End:   end,
+		})
+	}
+}
+
+func (cti *CurrentTrackInfo) UniqueCoverageAndMaxPosition() (float64, float64) {
+	if len(cti.Ranges) == 0 {
+		return 0.0, 0.0
+	}
+
+	sort.Slice(cti.Ranges, func(i, j int) bool {
+		return cti.Ranges[i].Start < cti.Ranges[j].Start
+	})
+
+	covered := 0.0
+	currentStart := cti.Ranges[0].Start
+	currentEnd := cti.Ranges[0].End
+
+	for _, r := range cti.Ranges[1:] {
+		if r.Start <= currentEnd {
+			currentEnd = max(currentEnd, r.End)
+		} else {
+			covered += currentEnd - currentStart
+			currentStart = r.Start
+			currentEnd = r.End
+		}
+	}
+
+	covered += currentEnd - currentStart
+	return covered, currentEnd
 }
 
 type LastfmWatchArgs struct {

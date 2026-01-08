@@ -54,6 +54,37 @@ var migrations = []Migration{
 		alter table plays add column source text;
 		`,
 	},
+	{
+		Version: 4,
+		Up: `
+		create table plays_temp (
+			id integer primary key autoincrement,
+			scrobbable boolean not null,
+			fulfilled boolean not null,
+
+			album text,
+			artist text not null,
+			title text not null,
+			duration integer not null,
+
+			listen_time integer not null,
+			wall_time integer,
+			max_position integer,
+			unique_coverage integer,
+			seek_count integer,
+
+			started_at timestamp not null,
+			source text
+		);
+
+		insert into plays_temp (
+			id, fulfilled, scrobbable, album, artist, title, duration, started_at, listen_time, source
+		) select id, fulfilled, true, album, artist, title, length, time, playedFor, source from plays;
+
+		drop table plays;
+		alter table plays_temp rename to plays;
+		`,
+	},
 }
 
 func getCurrentVersion(db *sql.DB) (int, error) {
