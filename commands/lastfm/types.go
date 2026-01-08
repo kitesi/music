@@ -141,6 +141,9 @@ type CurrentTrackInfo struct {
 
 	Ranges    []SongListenRange
 	SeekCount int
+
+	OpenRangeStart float64
+	RangeOpen      bool
 }
 
 func (cti *CurrentTrackInfo) ResetMetrics() {
@@ -152,6 +155,15 @@ func (cti *CurrentTrackInfo) ResetMetrics() {
 	cti.WallTime = 0
 	cti.Ranges = []SongListenRange{}
 	cti.SeekCount = 0
+	cti.OpenRangeStart = 0
+	cti.RangeOpen = false
+}
+
+func (cti *CurrentTrackInfo) CloseOpenRange(currentPosition float64) {
+	if cti.RangeOpen {
+		cti.AddListenRange(cti.OpenRangeStart, currentPosition)
+		cti.RangeOpen = false
+	}
 }
 
 func (cti *CurrentTrackInfo) AddListenRange(start, end float64) {

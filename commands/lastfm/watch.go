@@ -305,7 +305,11 @@ const SEEK_TOLERANCE_SECONDS = 8
 const SESSION_RESET_THRESHOLD_SECONDS = 90
 const DRIFT_TOLERANCE_SECONDS = 1.5
 
-func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, currentPosition float64, stdOut *log.Logger, stdErr *log.Logger) {
+func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *CurrentTrackInfo, args *LastfmWatchArgs, stdOut *log.Logger, stdErr *log.Logger) {
+	if currentTrack.Duration == -1.0 {
+		return
+	}
+
 	passingReason := ""
 	uniqueCoverage, maxPosition := currentTrack.UniqueCoverageAndMaxPosition()
 
@@ -313,6 +317,11 @@ func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *
 		passingReason = "it covered over half the track uniquely"
 	} else if currentTrack.ListenTime > float64(args.minListenTime) {
 		passingReason = "it listened for over the minimum listen time"
+	}
+
+	if currentTrack.Duration < float64(args.minTrackLength) {
+		stdOut.Printf("└── skipping track because it is too short")
+		passingReason = ""
 	}
 
 	realTimePassed := time.Since(currentTrack.StartTime).Seconds()
@@ -336,7 +345,7 @@ func attemptScrobble(db *sql.DB, credentials simpleconfig.Config, currentTrack *
 	}
 
 	if passingReason == "" {
-		stdOut.Printf("└── not scrobbling because it did not pass either listen condition (%s)", listenStats)
+		stdOut.Printf("└── not scrobbling because it did not pass either listen condition (%s) or it was too short", listenStats)
 	} else {
 		insertParams.Scrobbable = true
 
@@ -369,7 +378,10 @@ func watchForTracks(db *sql.DB, credentials simpleconfig.Config, currentTrack *C
 		// if we can't get the position, attempt to scrobble the current track and reset
 		if err != nil {
 			if currentTrack.Track != "" {
-				attemptScrobble(db, credentials, currentTrack, args, 0.0, stdOut, stdErr)
+				currentTrack.CloseOpenRange(currentTrack.LastPosition)
+				if currentTrack.Duration != -1.0 {
+					attemptScrobble(db, credentials, currentTrack, args, stdOut, stdErr)
+				}
 				currentTrack.Track = ""
 				currentTrack.Artist = ""
 				currentTrack.Album = ""
@@ -396,8 +408,9 @@ func watchForTracks(db *sql.DB, credentials simpleconfig.Config, currentTrack *C
 
 		// we've found a new song
 		if artist != currentTrack.Artist || track != currentTrack.Track || album != currentTrack.Album {
-			if currentTrack.Track != "" && currentTrack.Duration != -1.0 {
-				attemptScrobble(db, credentials, currentTrack, args, position, stdOut, stdErr)
+			if currentTrack.Track != "" {
+				currentTrack.CloseOpenRange(currentTrack.LastPosition)
+				attemptScrobble(db, credentials, currentTrack, args, stdOut, stdErr)
 			}
 
 			currentTrack.Track = track
@@ -413,9 +426,6 @@ func watchForTracks(db *sql.DB, credentials simpleconfig.Config, currentTrack *C
 			if err != nil {
 				stdErr.Printf("└── playerctl - could not parse length of")
 				currentTrack.Duration = -1.0
-			} else if length < float64(args.minTrackLength) {
-				stdOut.Printf("└── skipping track because it is too short")
-				currentTrack.Duration = -1.0
 			} else {
 				currentTrack.Duration = length
 			}
@@ -424,19 +434,36 @@ func watchForTracks(db *sql.DB, credentials simpleconfig.Config, currentTrack *C
 			absDeltaPos := math.Abs(deltaPos)
 			deltaTime := time.Since(currentTrack.LastUpdate).Seconds()
 			expectedPos := currentTrack.LastPosition + deltaTime
+			naturalPlayback := currentTrack.Duration > 0 && deltaPos > 0 && math.Abs(position-expectedPos) < DRIFT_TOLERANCE_SECONDS
 
-			if deltaPos > 0 && math.Abs(position-expectedPos) < DRIFT_TOLERANCE_SECONDS { // natural playback
-				currentTrack.ListenTime += deltaTime
-				currentTrack.AddListenRange(currentTrack.LastPosition, position)
+			event := "pause"
+
+			if naturalPlayback {
+				event = "natural"
 			} else if absDeltaPos > SESSION_RESET_THRESHOLD_SECONDS { // too much of a jump, reset session
-				if currentTrack.Duration != -1.0 {
-					attemptScrobble(db, credentials, currentTrack, args, position, stdOut, stdErr)
-				}
-				currentTrack.ResetMetrics()
-				currentTrack.StartTime = now
+				event = "reset"
 			} else if absDeltaPos > SEEK_TOLERANCE_SECONDS { // medium seek, intentional repositioning
+				event = "seek"
+			}
+
+			switch event {
+			case "natural":
+				if !currentTrack.RangeOpen {
+					currentTrack.OpenRangeStart = currentTrack.LastPosition
+					currentTrack.RangeOpen = true
+				}
+				currentTrack.ListenTime += deltaTime
+			case "seek":
+				currentTrack.CloseOpenRange(currentTrack.LastPosition)
 				currentTrack.SeekCount++
 				stdOut.Printf("└── playerctl - position seeked")
+			case "reset":
+				currentTrack.CloseOpenRange(currentTrack.LastPosition)
+				attemptScrobble(db, credentials, currentTrack, args, stdOut, stdErr)
+				currentTrack.ResetMetrics()
+				currentTrack.StartTime = now
+			case "pause":
+				currentTrack.CloseOpenRange(currentTrack.LastPosition)
 			}
 		}
 
@@ -500,12 +527,10 @@ func watchRunner(args *LastfmWatchArgs) error {
 		os.Remove(lockFileName)
 
 		if currentTrack.Track != "" {
-			position, err := getCurrentPosition()
-
 			if err != nil {
 				stdErrLog.Println("could not get position when gracefully exiting")
 			} else {
-				attemptScrobble(db, credentials, &currentTrack, args, position, stdOutLog, stdErrLog)
+				attemptScrobble(db, credentials, &currentTrack, args, stdOutLog, stdErrLog)
 			}
 		} else {
 			stdOutLog.Println("did not find any track when gracefully exiting")
