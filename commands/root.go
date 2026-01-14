@@ -36,7 +36,7 @@ func Execute() {
 	lastfmCommand.AddCommand(lastfm.WatchSetup())
 	lastfmCommand.AddCommand(lastfm.SuggestSetup())
 	lastfmCommand.AddCommand(lastfm.RecentSetup())
-	lastfmCommand.AddCommand(lastfm.ImportSetup())
+	lastfmCommand.AddCommand(lastfm.ImportUnfulfilledSetup())
 
 	spotifyCommand.AddCommand(spotify.ImportSetup())
 	spotifyCommand.AddCommand(spotify.SetOriginSetup())
