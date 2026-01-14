@@ -522,6 +522,15 @@ func watchRunner(args *LastfmWatchArgs) error {
 	stdErrLog := log.New(os.Stderr, "error: ", log.LstdFlags)
 
 	go func() {
+		stdOutLog.Println("attempting to import all unfulfilled plays from previous sessions...")
+		err = ImportUnfulfilledPlays(db, &credentials, stdOutLog, stdErrLog)
+
+		if err != nil {
+			stdErrLog.Printf("could not import unfulfilled plays: %s", err.Error())
+		}
+	}()
+
+	go func() {
 		<-gracefulExit
 		lockFile.Close()
 		os.Remove(lockFileName)

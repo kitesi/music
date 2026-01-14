@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	dbUtils "github.com/kitesi/music/db"
+	"github.com/kitesi/music/simpleconfig"
 	"github.com/kitesi/music/utils"
 	"github.com/spf13/cobra"
 )
@@ -55,7 +56,11 @@ func ImportUnfulfilledSetup() *cobra.Command {
 	return lastfmCommand
 }
 
-func ImportUnfulfilledPlays(db *sql.DB, apiKey, apiSecret, sessionKey string, stdOut *log.Logger, stdErr *log.Logger) error {
+func ImportUnfulfilledPlays(db *sql.DB, credentials *simpleconfig.Config, stdOut *log.Logger, stdErr *log.Logger) error {
+	apiKey, _ := credentials.Get("api_key")
+	apiSecret, _ := credentials.Get("api_secret")
+	sessionKey, _ := credentials.Get("session_key")
+
 	songsToScrobble, err := dbUtils.GetUnfulfilledPlays(db)
 
 	if err != nil {
@@ -165,10 +170,6 @@ func importUnfulfilledRunner(filename string, _ *LastfmImportArgs) error {
 		return err
 	}
 
-	apiKey, _ := credentials.Get("api_key")
-	apiSecret, _ := credentials.Get("api_secret")
-	sessionKey, _ := credentials.Get("session_key")
-
 	_, err = os.Stat(filename)
 
 	if os.IsNotExist(err) {
@@ -185,6 +186,6 @@ func importUnfulfilledRunner(filename string, _ *LastfmImportArgs) error {
 	stdErrLog := log.New(os.Stderr, "", log.LstdFlags)
 
 	defer db.Close()
-	err = ImportUnfulfilledPlays(db, apiKey, apiSecret, sessionKey, stdOutLog, stdErrLog)
+	err = ImportUnfulfilledPlays(db, &credentials, stdOutLog, stdErrLog)
 	return err
 }
