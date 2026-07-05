@@ -195,6 +195,8 @@ If you would like to automatically install the music add the `--install` flag wh
 
 ### Spotify Integration
 
+**NOTE**: this is now sort of deprecated because Spotify API added a requirement that for Dev Mode apps, the owner must have premium. Still usable if you have premium, but overall less useful.
+
 You can also sync Spotify playlists and albums with local tags. To get started first
 create a Spotify developer account and make an application. Then create a file ".music-spotify-credentials" in your cache directory.
 
