@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	REDIRECT_URI = "http://localhost:8080/callback"
+	PORT         = 1279
+	REDIRECT_URI = "http://127.0.0.1:1279/callback"
 	AUTH_URL     = "https://accounts.spotify.com/authorize"
 	TOKEN_URL    = "https://accounts.spotify.com/api/token"
 	API_BASE_URL = "https://api.spotify.com/v1"
@@ -466,7 +467,7 @@ func updateLocalPlaylistToMatch(playlistSongs []SpotifyTrackObject, localTagName
 func openServerAndGetAuthToken(clientId, clientSecret string) (SpotifyAuthTokenResponse, error) {
 	authCodeChan := make(chan string)
 	state := generateRandomState(16)
-	server := &http.Server{Addr: ":8080"}
+	server := &http.Server{Addr: fmt.Sprintf(":%d", PORT)}
 
 	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		handleCallback(w, r, authCodeChan, state, server)
